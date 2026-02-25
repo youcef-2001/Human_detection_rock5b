@@ -130,7 +130,7 @@ def main():
     parser = argparse.ArgumentParser(description="YOLOv8 thermique – Rock 5B NPU")
     parser.add_argument("--image", type=str, required=True)
     parser.add_argument("--model", type=str, default=str(MODEL_PATH))
-    parser.add_argument("--conf", type=float, default=0.25)
+    parser.add_argument("--conf", type=float, default=0.35)
     parser.add_argument("--iou", type=float, default=0.45)
     parser.add_argument("--out", type=str, default="results/result.jpg")
     args = parser.parse_args()
@@ -142,7 +142,15 @@ def main():
 
     # Prétraitement : 320x240 → 320x320 (padding haut/bas de 40px)
     img, ratio, pad = letterbox(img0)
+    
+    # --- CORRECTIONS ICI ---
+    # 1. Utiliser cv2.COLOR_BGR2GRAY pour convertir l'image couleur en gris
     inp = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    # 2. Ajouter les dimensions Batch (1) et Canal (1)
+    # Format NHWC : (Batch, Hauteur, Largeur, Canaux) -> (1, 320, 320, 1)
+    inp = np.expand_dims(inp, axis=0)
+    # -----------------------
 
     # Initialiser NPU (3 cœurs = pleine puissance 6 TOPS)
     rknn = RKNNLite(verbose=False)
