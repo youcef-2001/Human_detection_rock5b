@@ -1,193 +1,182 @@
+"""
+Détection thermique YOLOv8 sur Rock 5B (RK3588 NPU)
+Usage: python3 main.py --image test.jpg
+"""
 import argparse
+import time
 from pathlib import Path
+
 import cv2
 import numpy as np
 from rknnlite.api import RKNNLite
 
-
-CLASS_NAMES = ["Humain", "Objet_Chaud"]
-
-
-def letterbox(image, new_shape=(320, 320), color=(114, 114, 114)):
-    h, w = image.shape[:2]
-    if isinstance(new_shape, int):
-        new_shape = (new_shape, new_shape)
-
-    r = min(new_shape[0] / h, new_shape[1] / w)
-    new_unpad = (int(round(w * r)), int(round(h * r)))
-    dw = new_shape[1] - new_unpad[0]
-    dh = new_shape[0] - new_unpad[1]
-    dw /= 2
-    dh /= 2
-
-    if (w, h) != new_unpad:
-        image = cv2.resize(image, new_unpad, interpolation=cv2.INTER_LINEAR)
-
-    top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-    left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-    image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
-    return image, r, (dw, dh)
+# Configuration
+MODEL_PATH = Path(__file__).parent / "rknn" / "best.rknn"
+CLASSES = ["Humain", "Objet_Chaud"]
+COLORS = [(0, 255, 0), (0, 165, 255)]
+IMG_SIZE = 320  # Le modèle attend 320x320
 
 
-def xywh2xyxy(boxes):
-    out = boxes.copy()
-    out[:, 0] = boxes[:, 0] - boxes[:, 2] / 2
-    out[:, 1] = boxes[:, 1] - boxes[:, 3] / 2
-    out[:, 2] = boxes[:, 0] + boxes[:, 2] / 2
-    out[:, 3] = boxes[:, 1] + boxes[:, 3] / 2
-    return out
+def letterbox(img, size=IMG_SIZE):
+    """Redimensionne 320x240 → 320x320 en conservant le ratio, padding gris."""
+    h, w = img.shape[:2]
+    r = min(size / h, size / w)
+    nw, nh = int(round(w * r)), int(round(h * r))
+    dx, dy = (size - nw) / 2, (size - nh) / 2
+
+    img = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_LINEAR)
+    top, bottom = int(round(dy - 0.1)), int(round(dy + 0.1))
+    left, right = int(round(dx - 0.1)), int(round(dx + 0.1))
+    img = cv2.copyMakeBorder(img, top, bottom, left, right,
+                             cv2.BORDER_CONSTANT, value=(114, 114, 114))
+    return img, r, (dx, dy)
 
 
-def iou(box, boxes):
-    x1 = np.maximum(box[0], boxes[:, 0])
-    y1 = np.maximum(box[1], boxes[:, 1])
-    x2 = np.minimum(box[2], boxes[:, 2])
-    y2 = np.minimum(box[3], boxes[:, 3])
-
-    inter = np.maximum(0, x2 - x1) * np.maximum(0, y2 - y1)
-    area1 = (box[2] - box[0]) * (box[3] - box[1])
-    area2 = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
-    union = area1 + area2 - inter + 1e-6
-    return inter / union
-
-
-def nms_classwise(boxes, scores, classes, iou_thres=0.45):
+def nms(boxes, scores, iou_thr=0.45):
+    """NMS sur un ensemble de boîtes."""
+    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    areas = (x2 - x1) * (y2 - y1)
+    order = scores.argsort()[::-1]
     keep = []
-    for c in np.unique(classes):
-        idx = np.where(classes == c)[0]
-        b = boxes[idx]
-        s = scores[idx]
-        order = s.argsort()[::-1]
 
-        while len(order) > 0:
-            i = order[0]
-            keep.append(idx[i])
-            if len(order) == 1:
-                break
-            ious = iou(b[i], b[order[1:]])
-            order = order[1:][ious <= iou_thres]
+    while order.size > 0:
+        i = order[0]
+        keep.append(i)
+        if order.size == 1:
+            break
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+        inter = np.maximum(0, xx2 - xx1) * np.maximum(0, yy2 - yy1)
+        iou = inter / (areas[i] + areas[order[1:]] - inter + 1e-6)
+        order = order[1:][iou <= iou_thr]
+
     return keep
 
 
-def decode_outputs(outputs, nc=2):
-    preds = []
-    for o in outputs:
-        a = np.array(o)
-        a = np.squeeze(a)
+def postprocess(outputs, orig_hw, ratio, pad, conf_thr=0.25, iou_thr=0.45):
+    """Décode les sorties RKNN → boîtes, scores, classes."""
+    nc = len(CLASSES)
 
-        if a.ndim == 2:
-            if a.shape[1] in (4 + nc, 5 + nc):
-                preds.append(a)
-            elif a.shape[0] in (4 + nc, 5 + nc):
-                preds.append(a.T)
+    raw = np.concatenate([np.squeeze(o) for o in outputs], axis=-1)
+    if raw.shape[0] == 4 + nc:
+        raw = raw.T
 
-    if not preds:
-        raise RuntimeError("Format de sortie non supporté. Vérifiez le modèle RKNN exporté.")
-    return np.concatenate(preds, axis=0)
+    cx, cy, w, h = raw[:, 0], raw[:, 1], raw[:, 2], raw[:, 3]
+    x1, y1 = cx - w / 2, cy - h / 2
+    x2, y2 = cx + w / 2, cy + h / 2
 
+    cls_scores = raw[:, 4:4 + nc]
+    cls_ids = np.argmax(cls_scores, axis=1)
+    conf = np.max(cls_scores, axis=1)
 
-def postprocess(outputs, orig_shape, ratio, pad, conf_thres=0.25, iou_thres=0.45, nc=2):
-    pred = decode_outputs(outputs, nc=nc)
+    mask = conf >= conf_thr
+    x1, y1, x2, y2 = x1[mask], y1[mask], x2[mask], y2[mask]
+    conf, cls_ids = conf[mask], cls_ids[mask]
 
-    if pred.shape[1] == 4 + nc:
-        boxes = pred[:, :4]
-        cls_scores = pred[:, 4:]
-        cls_ids = np.argmax(cls_scores, axis=1)
-        conf = np.max(cls_scores, axis=1)
-    elif pred.shape[1] >= 5 + nc:
-        boxes = pred[:, :4]
-        obj = pred[:, 4]
-        cls_scores = pred[:, 5:5 + nc]
-        cls_ids = np.argmax(cls_scores, axis=1)
-        conf = obj * np.max(cls_scores, axis=1)
-    else:
-        raise RuntimeError(f"Sortie invalide: shape={pred.shape}")
+    if len(conf) == 0:
+        return np.empty((0, 4)), np.array([]), np.array([], dtype=int)
 
-    mask = conf >= conf_thres
-    boxes, conf, cls_ids = boxes[mask], conf[mask], cls_ids[mask]
-    if len(boxes) == 0:
-        return np.empty((0, 4)), np.array([]), np.array([])
+    # Undo letterbox → coordonnées image originale (320x240)
+    x1 = (x1 - pad[0]) / ratio
+    y1 = (y1 - pad[1]) / ratio
+    x2 = (x2 - pad[0]) / ratio
+    y2 = (y2 - pad[1]) / ratio
 
-    boxes = xywh2xyxy(boxes)
+    oh, ow = orig_hw
+    x1, x2 = np.clip(x1, 0, ow), np.clip(x2, 0, ow)
+    y1, y2 = np.clip(y1, 0, oh), np.clip(y2, 0, oh)
 
-    # Revenir à l'image d'origine (undo letterbox)
-    boxes[:, [0, 2]] -= pad[0]
-    boxes[:, [1, 3]] -= pad[1]
-    boxes[:, :4] /= ratio
+    boxes = np.stack([x1, y1, x2, y2], axis=1)
 
-    h, w = orig_shape[:2]
-    boxes[:, 0] = np.clip(boxes[:, 0], 0, w - 1)
-    boxes[:, 1] = np.clip(boxes[:, 1], 0, h - 1)
-    boxes[:, 2] = np.clip(boxes[:, 2], 0, w - 1)
-    boxes[:, 3] = np.clip(boxes[:, 3], 0, h - 1)
+    # NMS par classe
+    keep = []
+    for c in range(nc):
+        idx = np.where(cls_ids == c)[0]
+        if len(idx) == 0:
+            continue
+        k = nms(boxes[idx], conf[idx], iou_thr)
+        keep.extend(idx[k])
 
-    keep = nms_classwise(boxes, conf, cls_ids, iou_thres=iou_thres)
+    keep = sorted(keep)
     return boxes[keep], conf[keep], cls_ids[keep]
 
 
-def draw_and_count(image, boxes, scores, cls_ids):
-    counts = {name: 0 for name in CLASS_NAMES}
+def draw(image, boxes, scores, cls_ids):
+    """Dessine les détections et retourne l'image + compteurs."""
+    counts = {name: 0 for name in CLASSES}
     out = image.copy()
 
-    for b, s, c in zip(boxes, scores, cls_ids):
-        c = int(c)
-        c = c if c < len(CLASS_NAMES) else 0
-        name = CLASS_NAMES[c]
+    for (x1, y1, x2, y2), score, cid in zip(boxes, scores, cls_ids):
+        cid = int(cid)
+        name = CLASSES[cid]
+        color = COLORS[cid]
         counts[name] += 1
 
-        x1, y1, x2, y2 = map(int, b)
-        color = (0, 255, 0) if c == 0 else (0, 165, 255)
-        cv2.rectangle(out, (x1, y1), (x2, y2), color, 2)
-        cv2.putText(out, f"{name} {s:.2f}", (x1, max(20, y1 - 6)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        pt1, pt2 = (int(x1), int(y1)), (int(x2), int(y2))
+        cv2.rectangle(out, pt1, pt2, color, 2)
+
+        label = f"{name} {score:.0%}"
+        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+        cv2.rectangle(out, (pt1[0], pt1[1] - th - 6), (pt1[0] + tw, pt1[1]), color, -1)
+        cv2.putText(out, label, (pt1[0], pt1[1] - 3),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
 
     return out, counts
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="rknn/best.rknn")
+    parser = argparse.ArgumentParser(description="YOLOv8 thermique – Rock 5B NPU")
     parser.add_argument("--image", type=str, required=True)
-    parser.add_argument("--imgsz", type=int, default=320)
+    parser.add_argument("--model", type=str, default=str(MODEL_PATH))
     parser.add_argument("--conf", type=float, default=0.25)
     parser.add_argument("--iou", type=float, default=0.45)
     parser.add_argument("--out", type=str, default="results/result.jpg")
     args = parser.parse_args()
 
-    model_path = Path(args.model)
-    image_path = Path(args.image)
+    # Charger image (320x240)
+    img0 = cv2.imread(args.image)
+    assert img0 is not None, f"Image introuvable: {args.image}"
+    print(f"Image chargée: {img0.shape[1]}x{img0.shape[0]}")
+
+    # Prétraitement : 320x240 → 320x320 (padding haut/bas de 40px)
+    img, ratio, pad = letterbox(img0)
+    inp = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # Initialiser NPU (3 cœurs = pleine puissance 6 TOPS)
+    rknn = RKNNLite(verbose=False)
+    assert rknn.load_rknn(args.model) == 0, "Échec load_rknn"
+    assert rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_0_1_2) == 0, "Échec init NPU"
+
+    # Inférence
+    t0 = time.perf_counter()
+    outputs = rknn.inference(inputs=[inp])
+    dt = (time.perf_counter() - t0) * 1000
+
+    # Post-traitement
+    boxes, scores, cls_ids = postprocess(
+        outputs, img0.shape[:2], ratio, pad, args.conf, args.iou
+    )
+
+    # Résultat
+    result, counts = draw(img0, boxes, scores, cls_ids)
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    img0 = cv2.imread(str(image_path))
-    if img0 is None:
-        raise FileNotFoundError(f"Image introuvable: {image_path}")
-
-    img, ratio, pad = letterbox(img0, (args.imgsz, args.imgsz))
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    rknn = RKNNLite(verbose=False)
-    ret = rknn.load_rknn(str(model_path))
-    if ret != 0:
-        raise RuntimeError("load_rknn a échoué")
-
-    ret = rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_AUTO)
-    if ret != 0:
-        raise RuntimeError("init_runtime a échoué (Rock 5B)")
-
-    outputs = rknn.inference(inputs=[img])
-    boxes, scores, cls_ids = postprocess(
-        outputs, img0.shape, ratio, pad, conf_thres=args.conf, iou_thres=args.iou, nc=len(CLASS_NAMES)
-    )
-    result_img, counts = draw_and_count(img0, boxes, scores, cls_ids)
-
-    cv2.imwrite(str(out_path), result_img)
+    cv2.imwrite(str(out_path), result)
     rknn.release()
 
-    print("=== Résultats ===")
-    for k, v in counts.items():
-        print(f"{k}: {v}")
-    print(f"Image résultat: {out_path}")
+    # Affichage
+    print(f"\n{'='*40}")
+    print(f" Inférence NPU : {dt:.1f} ms")
+    print(f"{'='*40}")
+    total = 0
+    for name, n in counts.items():
+        print(f" {name:15s}: {n}")
+        total += n
+    print(f" {'Total':15s}: {total}")
+    print(f"{'='*40}")
+    print(f" Résultat → {out_path}\n")
 
 
 if __name__ == "__main__":
