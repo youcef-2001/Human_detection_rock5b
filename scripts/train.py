@@ -1,6 +1,22 @@
 from ultralytics import YOLO
+import os
+import locale
+
+def _setup_utf8():
+    # Variables locales UTF-8
+    os.environ.setdefault("LANG", "C.UTF-8")
+    os.environ.setdefault("LC_ALL", "C.UTF-8")
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
+    # Recharge la locale depuis les variables d'environnement
+    try:
+        locale.setlocale(locale.LC_ALL, "")
+    except locale.Error:
+        pass
 
 def main():
+    _setup_utf8()
+
     print("=== Démarrage de l'entraînement YOLOv8 Thermique ===")
     
     # 1. Charger le modèle YOLOv8 nano (le plus léger et rapide, parfait pour le NPU du RK3588)
@@ -9,19 +25,19 @@ def main():
     # 2. Lancer l'entraînement
     results = model.train(
         data='./dataset/data.yaml', # <-- Vérifiez que ce chemin correspond à votre fichier yaml
-        epochs=100,                 # 100 passages sur vos 2000 images est un excellent point de départ
+        epochs=300,                 # 100 passages sur vos 2000 images est un excellent point de départ
         imgsz=320,                  # La résolution à laquelle nous avons agrandi les images
         batch=16,                   # Mettez 32 si votre PC a beaucoup de RAM, sinon gardez 16
-        device='cpu',               # Mettez '0' si vous avez une carte graphique Nvidia sur votre PC
+        device='0',               # Mettez '0' si vous avez une carte graphique Nvidia sur votre PC
         project='models',
         name='mon_YOLOv8',
         
         # --- OPTIMISATIONS THERMIQUES STRICTES (Ne pas modifier) ---
         # On interdit à YOLO de modifier les couleurs et la luminosité 
         # pour que les températures (niveaux de gris) ne soient pas faussées.
-        hsv_h=0.0,             
-        hsv_s=0.0,             
-        hsv_v=0.0,             
+        # hsv_h=0.0,             
+        # hsv_s=0.0,             
+        # hsv_v=0.0,             
         
         # --- AUGMENTATION GÉOMÉTRIQUE MODÉRÉE ---
         # On aide le modèle à être plus robuste en créant de fausses situations

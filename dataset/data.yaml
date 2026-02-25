@@ -1,6 +1,7 @@
-path: /home/rock/Desktop/RKSDK/rknn-toolkit2/JYEG/human_detection_rock5b/dataset
+path: /home/ybaleh/Bureau/RKSDK/rknn-toolkit2/JYEG/Human_detection_rock5b/dataset
+
 train: images/train
-val: images/val
+val: images/train
 
 # Nombre de classes
 nc: 2
