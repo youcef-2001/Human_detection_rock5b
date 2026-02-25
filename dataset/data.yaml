@@ -1,0 +1,9 @@
+path: /home/rock/Desktop/RKSDK/rknn-toolkit2/JYEG/human_detection_rock5b/dataset
+train: images/train
+val: images/val
+
+# Nombre de classes
+nc: 2
+
+# Nom des classes
+names: ['Humain', 'Objet_Chaud']
