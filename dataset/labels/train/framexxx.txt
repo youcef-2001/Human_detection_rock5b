@@ -1,0 +1,3 @@
+<ID_classe> <X_centre> <Y_centre> <Largeur> <Hauteur> #valeurs entre 1 et 0 normaliser
+0 0.5 0.4 0.2 0.8 
+#Un humain au milieu de l'image

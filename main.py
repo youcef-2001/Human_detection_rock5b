@@ -1,2 +1,7 @@
-import tensorflow as tf
-print(tf.lite.Interpreter(model_path="model.tflite").get_input_details())
+
+
+
+
+if __name__ == "__main__":
+
+    print("you are in main")
