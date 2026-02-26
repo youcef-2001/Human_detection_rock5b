@@ -6,7 +6,7 @@ import cv2
 
 def convert_npy_to_png(npy_folder="dataset_npy/", images_folder = "dataset/images/train/" , labels_folder = "dataset/labels/train/"    ):
     # --- CONFIGURATION ---
-    # npy_folder = "dataset_npy/"                 # Dossier où se trouvent vos 2000 fichiers .npy
+    # npy_folder = "dataset_npy/"     
     # images_folder = "dataset/images/train/"     # Dossier de sortie pour les PNG (YOLO)
     # labels_folder = "dataset/labels/train/"     # Dossier de sortie pour les TXT (YOLO)
 
