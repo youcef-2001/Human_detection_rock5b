@@ -14,7 +14,7 @@ def _setup_utf8():
     except locale.Error:
         pass
 
-def main():
+def train(   _name='mon_YOLOv8'):
     _setup_utf8()
 
     print("=== Démarrage de l'entraînement YOLOv8 Thermique ===")
@@ -25,12 +25,12 @@ def main():
     # 2. Lancer l'entraînement
     results = model.train(
         data='./dataset/data.yaml', # <-- Vérifiez que ce chemin correspond à votre fichier yaml
-        epochs=300,                 # 100 passages sur vos 2000 images est un excellent point de départ
+        epochs=400,                 # 100 passages sur vos 2000 images est un excellent point de départ
         imgsz=320,                  # La résolution à laquelle nous avons agrandi les images
-        batch=16,                   # Mettez 32 si votre PC a beaucoup de RAM, sinon gardez 16
+        batch=32,                   # Mettez 32 si votre PC a beaucoup de RAM, sinon gardez 16
         device='0',               # Mettez '0' si vous avez une carte graphique Nvidia sur votre PC
         project='models',
-        name='mon_YOLOv8',
+        name=_name,
         
         # --- OPTIMISATIONS THERMIQUES STRICTES (Ne pas modifier) ---
         # On interdit à YOLO de modifier les couleurs et la luminosité 
@@ -56,4 +56,4 @@ def main():
 if __name__ == '__main__':
     # Ce bloc if __name__ == '__main__' est parfois requis par Windows/PyTorch 
     # pour bien gérer le multi-threading pendant l'entraînement.
-    main()
+    train()
