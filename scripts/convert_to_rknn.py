@@ -11,8 +11,7 @@ RKNN_DIR.mkdir(parents=True, exist_ok=True)
 
 # Configuration par défaut pour Rock 5B
 DEFAULT_PLATFORM = 'rk3588'
-DEFAULT_QUANT = True  # i8 quantification (recommandé pour NPU)
-DEFAULT_DTYPE = 'i8'
+DEFAULT_QUANT = False  # i8 quantification (recommandé pour NPU)
 
 def parse_arg():
     """
@@ -61,8 +60,10 @@ def parse_arg():
     return str(model_path), DEFAULT_PLATFORM, do_quant, str(output_path)
 
 
-if __name__ == '__main__':
-    model_path, platform, do_quant, output_path = parse_arg()
+
+def convert_to_rknn( model_path, platform, do_quant, output_path ):
+
+
 
     print(f"\n{'='*60}")
     print(f"Conversion ONNX → RKNN pour Rock 5B (RK3588)")
@@ -121,3 +122,9 @@ if __name__ == '__main__':
     print("✓ Conversion terminée avec succès!")
     print(f"Transférez {output_path} sur votre Rock 5B")
     print(f"{'='*60}\n")
+
+
+if __name__ == '__main__':
+
+    model_path, platform, do_quant, output_path = parse_arg()
+    convert_to_rknn(model_path,platform,do_quant,output_path)
