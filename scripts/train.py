@@ -25,9 +25,9 @@ def train(   _name='mon_YOLOv8'):
     # 2. Lancer l'entraînement
     results = model.train(
         data='./dataset/data.yaml', # <-- Vérifiez que ce chemin correspond à votre fichier yaml
-        epochs=400,                 # 100 passages sur vos 2000 images est un excellent point de départ
+        epochs=500,                 # 100 passages sur vos 2000 images est un excellent point de départ
         imgsz=320,                  # La résolution à laquelle nous avons agrandi les images
-        batch=32,                   # Mettez 32 si votre PC a beaucoup de RAM, sinon gardez 16
+        batch=64,                   # Mettez 32 si votre PC a beaucoup de RAM, sinon gardez 16
         device='0',               # Mettez '0' si vous avez une carte graphique Nvidia sur votre PC
         project='models',
         name=_name,
