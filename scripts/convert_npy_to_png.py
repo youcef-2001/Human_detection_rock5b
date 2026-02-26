@@ -18,7 +18,7 @@ def convert_npy_to_png(npy_folder="dataset_npy/", images_folder = "dataset/image
     TEMP_MIN_GLOBALE = 5.0 
     TEMP_MAX_GLOBALE = 55.0
 
-    TEMP_SEUIL = 31.0   # Frontière Humain / Objet chaud
+    TEMP_SEUIL = 33.0   # Frontière Humain / Objet chaud
     SCALE_FACTOR = 10   # Agrandissement 32x24 -> 320x240 pour YOLO
 
     # Compteurs
