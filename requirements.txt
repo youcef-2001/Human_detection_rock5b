@@ -4,7 +4,6 @@
 ### Autre requirements installer via les instructions de la documentation
 ### Requirements additionnels
 
-tensorflow
-onnxscript
-ultralytics
-websockets
+onnxscript==0.2.1
+ultralytics==8.4.16
+websockets==14.1
