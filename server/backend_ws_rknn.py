@@ -15,6 +15,7 @@ import websockets
 CLASSES = ["Humain", "Objet_Chaud"]
 IMG_SIZE = 320
 HUMAN_CLASS_INDEX = 0
+HOT_OBJECT_CLASS_INDEX = 1
 THERMAL_WIDTH = 32
 THERMAL_HEIGHT = 24
 
@@ -207,7 +208,8 @@ class HumanDetectorSingleton:
 
         self._initialized = True
 
-    def infer_human_count(self, image: np.ndarray) -> int:
+    def infer_detections(self, image: np.ndarray) -> dict:
+        """Retourne le nombre d'humains et d'objets chauds détectés."""
         # Si c'est une frame thermique brute (24x32 float), la convertir
         # en image BGR exactement comme le script d'entraînement
         if (
@@ -231,9 +233,9 @@ class HumanDetectorSingleton:
             conf_thr=self.conf,
             iou_thr=self.iou,
         )
-        if len(cls_ids) == 0:
-            return 0
-        return int(np.sum(cls_ids == HUMAN_CLASS_INDEX))
+        human_count = int(np.sum(cls_ids == HUMAN_CLASS_INDEX)) if len(cls_ids) else 0
+        hot_object_count = int(np.sum(cls_ids == HOT_OBJECT_CLASS_INDEX)) if len(cls_ids) else 0
+        return {"human_count": human_count, "hot_object_count": hot_object_count}
 
     def release(self):
         if getattr(self, "rknn", None) is not None:
@@ -249,11 +251,12 @@ async def run_client(uri: str, detector: HumanDetectorSingleton):
                 async for message in ws:
                     try:
                         frame = decode_npy_payload(message)
-                        count = detector.infer_human_count(frame)
-                        has_humans = count > 0
+                        detections = detector.infer_detections(frame)
                         response = {
-                            "has_humans": has_humans,
-                            "human_count": count,
+                            "has_humans": detections["human_count"] > 0,
+                            "human_count": detections["human_count"],
+                            "has_hot_objects": detections["hot_object_count"] > 0,
+                            "hot_object_count": detections["hot_object_count"],
                         }
                         await ws.send(json.dumps(response))
                         print(f"Résultat envoyé: {response}")
