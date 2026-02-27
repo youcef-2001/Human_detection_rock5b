@@ -1,10 +1,7 @@
-#miniforce et envirronnement Conda setup avec la Doc radxa disponible en ligne
+#miniforge et envirronnement Conda setup avec la Doc radxa disponible en ligne
 #python v3.11 pour ce projet
 #rknn et rknnlite installer aussi avec la documentation radxa
 ### Autre requirements installer via les instructions de la documentation
-#pytorch
-
-
 ### Requirements additionnels
 
 tensorflow

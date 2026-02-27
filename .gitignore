@@ -1,4 +1,6 @@
 
 
 
-/dataset/
+dataset/
+.vscode
+check*
