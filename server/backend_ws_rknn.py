@@ -245,8 +245,8 @@ async def run_client(uri: str, detector: HumanDetectorSingleton):
 
 def main():
     parser = argparse.ArgumentParser(description="Client websocket RKNN (ESP8266)")
-    parser.add_argument("--ws-url", type=str, default="ws://10.28.26.7/ws")
-    parser.add_argument("--model", type=str, default=str(Path("rknn") / "best.rknn"))
+    parser.add_argument("--ws-url", type=str, default="ws://10.28.26.7:81/")
+    parser.add_argument("--model", type=str, default=str(Path("rknn") / "Version6.rknn"))
     parser.add_argument("--conf", type=float, default=0.35)
     parser.add_argument("--iou", type=float, default=0.45)
     args = parser.parse_args()
