@@ -18,6 +18,11 @@ HUMAN_CLASS_INDEX = 0
 THERMAL_WIDTH = 32
 THERMAL_HEIGHT = 24
 
+# Constantes identiques au script convert_npy_to_png.py utilisé pour l'entraînement
+TEMP_MIN_GLOBALE = 5.0
+TEMP_MAX_GLOBALE = 55.0
+SCALE_FACTOR = 10  # 32x24 -> 320x240
+
 
 def letterbox(img: np.ndarray, size: int = IMG_SIZE) -> Tuple[np.ndarray, float, Tuple[float, float]]:
     h, w = img.shape[:2]
@@ -112,6 +117,19 @@ def postprocess(
     return boxes[keep], conf[keep], cls_ids[keep]
 
 
+def thermal_to_bgr(thermal: np.ndarray) -> np.ndarray:
+    """Convertit une frame thermique float (24x32) en image BGR (240x320)
+    exactement comme convert_npy_to_png.py le fait pour l'entraînement."""
+    img_clipped = np.clip(thermal, TEMP_MIN_GLOBALE, TEMP_MAX_GLOBALE)
+    img_8u = ((img_clipped - TEMP_MIN_GLOBALE) / (TEMP_MAX_GLOBALE - TEMP_MIN_GLOBALE) * 255.0).astype(np.uint8)
+    large_img = cv2.resize(
+        img_8u,
+        (THERMAL_WIDTH * SCALE_FACTOR, THERMAL_HEIGHT * SCALE_FACTOR),
+        interpolation=cv2.INTER_NEAREST,
+    )
+    return cv2.cvtColor(large_img, cv2.COLOR_GRAY2BGR)
+
+
 def ensure_bgr(image: np.ndarray) -> np.ndarray:
     if image.ndim == 2:
         return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
@@ -190,7 +208,16 @@ class HumanDetectorSingleton:
         self._initialized = True
 
     def infer_human_count(self, image: np.ndarray) -> int:
-        bgr = ensure_bgr(image)
+        # Si c'est une frame thermique brute (24x32 float), la convertir
+        # en image BGR exactement comme le script d'entraînement
+        if (
+            image.ndim == 2
+            and image.shape == (THERMAL_HEIGHT, THERMAL_WIDTH)
+            and image.dtype in (np.float32, np.float64)
+        ):
+            bgr = thermal_to_bgr(image)
+        else:
+            bgr = ensure_bgr(image)
         img320, ratio, pad = letterbox(bgr, IMG_SIZE)
         inp = cv2.cvtColor(img320, cv2.COLOR_BGR2RGB)
         inp = np.expand_dims(inp, axis=0)
