@@ -15,6 +15,8 @@ import websockets
 CLASSES = ["Humain", "Objet_Chaud"]
 IMG_SIZE = 320
 HUMAN_CLASS_INDEX = 0
+THERMAL_WIDTH = 32
+THERMAL_HEIGHT = 24
 
 
 def letterbox(img: np.ndarray, size: int = IMG_SIZE) -> Tuple[np.ndarray, float, Tuple[float, float]]:
@@ -122,9 +124,20 @@ def ensure_bgr(image: np.ndarray) -> np.ndarray:
 
 def decode_npy_payload(payload) -> np.ndarray:
     if isinstance(payload, bytes):
-        with io.BytesIO(payload) as buffer:
-            arr = np.load(buffer, allow_pickle=False)
-        return np.asarray(arr)
+        try:
+            with io.BytesIO(payload) as buffer:
+                arr = np.load(buffer, allow_pickle=False)
+            return np.asarray(arr)
+        except Exception:
+            if len(payload) % 4 != 0:
+                raise ValueError(
+                    "Payload binaire invalide: taille non multiple de 4 pour des float32"
+                )
+
+            arr = np.frombuffer(payload, dtype="<f4")
+            if arr.size == THERMAL_WIDTH * THERMAL_HEIGHT:
+                return arr.reshape((THERMAL_HEIGHT, THERMAL_WIDTH))
+            return arr
 
     if isinstance(payload, str):
         message = payload.strip()
@@ -135,6 +148,16 @@ def decode_npy_payload(payload) -> np.ndarray:
                 with io.BytesIO(raw) as buffer:
                     arr = np.load(buffer, allow_pickle=False)
                 return np.asarray(arr)
+            if "float32_base64" in obj:
+                raw = base64.b64decode(obj["float32_base64"])
+                if len(raw) % 4 != 0:
+                    raise ValueError(
+                        "float32_base64 invalide: taille non multiple de 4"
+                    )
+                arr = np.frombuffer(raw, dtype="<f4")
+                if arr.size == THERMAL_WIDTH * THERMAL_HEIGHT:
+                    return arr.reshape((THERMAL_HEIGHT, THERMAL_WIDTH))
+                return arr
         raise ValueError("Message texte non supporté (attendu JSON avec npy_base64)")
 
     raise ValueError("Type de payload websocket non supporté")
