@@ -11,7 +11,7 @@ import numpy as np
 from rknnlite.api import RKNNLite
 
 # Configuration
-MODEL_PATH = Path(__file__).parent / "rknn" / "best.rknn"
+MODEL_PATH = Path(__file__).parent / "rknn" / "Version6.rknn"
 CLASSES = ["Humain", "Objet_Chaud"]
 COLORS = [(0, 255, 0), (0, 165, 255)]
 IMG_SIZE = 320  # Le modèle attend 320x320
@@ -130,7 +130,7 @@ def main():
     parser = argparse.ArgumentParser(description="YOLOv8 thermique – Rock 5B NPU")
     parser.add_argument("--image", type=str, required=True)
     parser.add_argument("--model", type=str, default=str(MODEL_PATH))
-    parser.add_argument("--conf", type=float, default=0.35)
+    parser.add_argument("--conf", type=float, default=0.75)
     parser.add_argument("--iou", type=float, default=0.45)
     parser.add_argument("--out", type=str, default="results/result.jpg")
     args = parser.parse_args()
