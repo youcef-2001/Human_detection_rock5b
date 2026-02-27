@@ -1,6 +1,7 @@
+/dataset/images
+/dataset/labels
 
 
-
-dataset/
 .vscode
 check*
+yolo*
