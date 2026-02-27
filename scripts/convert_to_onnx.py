@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 
 
-def convert_to_onnx(   name='mon_YOLOv84',):
+def convert_to_onnx(   name='mon_YOLOv86',):
     # Racine du projet: .../Human_detection_rock5b
     ROOT = Path(__file__).resolve().parents[1]
     ONNX_DIR = ROOT / "onnx"
