@@ -122,12 +122,12 @@ def draw_and_count(image, boxes, scores, cls_ids):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="rknn/best.rknn")
+    parser.add_argument("--model", type=str, default="onnx/mon_YOLOv86.onnx")
     parser.add_argument("--image", type=str, required=True)
     parser.add_argument("--imgsz", type=int, default=320)
-    parser.add_argument("--conf", type=float, default=0.25)
+    parser.add_argument("--conf", type=float, default=0.85)
     parser.add_argument("--iou", type=float, default=0.45)
-    parser.add_argument("--out", type=str, default="results/result_pc.jpg")
+    parser.add_argument("--out", type=str, default="results/result_pc2.jpg")
     args = parser.parse_args()
 
     img0 = cv2.imread(args.image)
@@ -138,16 +138,26 @@ def main():
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     rknn = RKNN(verbose=False)
-    ret = rknn.load_rknn(args.model)
-    if ret != 0:
-        raise RuntimeError("load_rknn a échoué")
 
-    # Simulation PC RK3588
-    ret = rknn.init_runtime(target="rk3588")
-    if ret != 0:
-        raise RuntimeError("init_runtime(target='rk3588') a échoué")
+    # Configuration obligatoire avant load_onnx
+    rknn.config(target_platform="rk3588")
 
-    outputs = rknn.inference(inputs=[img])
+    # Charger le modèle ONNX (pas .rknn) pour le simulateur PC
+    ret = rknn.load_onnx(model=args.model)
+    if ret != 0:
+        raise RuntimeError("load_onnx a échoué")
+
+    # Construire le modèle pour le simulateur
+    ret = rknn.build(do_quantization=False)
+    if ret != 0:
+        raise RuntimeError("build a échoué")
+
+    # Simulateur PC (pas de target = simulation CPU)
+    ret = rknn.init_runtime()
+    if ret != 0:
+        raise RuntimeError("init_runtime (simulateur) a échoué")
+
+    outputs = rknn.inference(inputs=[np.expand_dims(img, axis=0)])
     boxes, scores, cls_ids = postprocess(
         outputs, img0.shape, ratio, pad, conf_thres=args.conf, iou_thres=args.iou, nc=len(CLASS_NAMES)
     )
