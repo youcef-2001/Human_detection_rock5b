@@ -17,7 +17,7 @@ Détection de personnes à partir d’un capteur thermique basé sur MLX90640, a
 - Une carte Radxa ROCK 5B (ou équivalent) pour l’inférence embarquée.
 - Un PC pour l’entraînement YOLOv8.
 - Un capteur/caméra thermique MLX90640BAA ou compatible (32×24 pixels IR).  
-- Python 3.9+ avec les bibliothèques listées dans `requirements.txt`.
+- Python 3.11 avec les bibliothèques listées dans `requirements.txt`.
 - SDK RKNN/RKNPU correctement installé sur la ROCK 5B (pour l’inférence NPU).
 
 ## Installation
@@ -28,15 +28,12 @@ Cloner le dépôt :
 git clone https://github.com/youcef-2001/Human_detection_rock5b.git
 cd Human_detection_rock5b
 ```
+Installer et configurer le SDK RKNN / RKNPU sur la ROCK 5B selon la documentation du constructeur.
 
-(Optionnel) Créer et activer un environnement virtuel :
+Activer l'environnement rknn créé :
 
 ```bash
-python -m venv .venv
-# Linux / macOS
-source .venv/bin/activate
-# Windows
-# .venv\Scripts\activate
+conda activate rknn
 ```
 
 Installer les dépendances :
@@ -45,31 +42,24 @@ Installer les dépendances :
 pip install -r requirements.txt
 ```
 
-Installer et configurer le SDK RKNN / RKNPU sur la ROCK 5B selon la documentation du constructeur.
+
 
 ## Utilisation rapide
 
 ### Inférence sur PC
 
-Exemple typique (à adapter à tes options réelles) :
+
 
 ```bash
-python mainPC.py --weights runs/detect/models/mon_YOLOv8/weights/best.pt --source 0 --conf 0.5
+python test_inference_PC.py --image ./dataset/images/train/frame.png 
 ```
-
-- `--weights` : chemin vers un modèle YOLOv8 (`.pt` ou `.onnx`).
-- `--source` : index de la caméra ou chemin vers une vidéo/fichier image.
-- `--conf` : seuil de confiance minimal.
 
 ### Inférence sur ROCK 5B (local)
 
 ```bash
-python main.py --model rknn/mon_YOLOv84.rknn --source 0 --conf 0.5
+python test_inference_rock5b.py --image ./dataset/images/train/frame.png 
 ```
 
-- `--model` : fichier RKNN compilé.
-- `--source` : flux vidéo (caméra connectée à la ROCK 5B).
-- `--conf` : seuil de confiance.
 
 ### Backend serveur RKNN
 
@@ -86,11 +76,9 @@ Un client externe (PC, navigateur, autre microcontrôleur) peut alors envoyer de
 ```text
 Human_detection_rock5b/
 ├── .gitignore
-├── main.py
-├── mainPC.py
+├── test_inference_PC.py
+├── test_inference_rock5b.py
 ├── requirements.txt
-├── Screenshot_*.png
-├── screen_entrainement.png
 │
 ├── dataset/
 │   └── data.yaml
@@ -138,23 +126,8 @@ Human_detection_rock5b/
 
 ## Description des principaux fichiers
 
-### `main.py`
 
-Script principal pour la ROCK 5B.
 
-- Charge un modèle RKNN depuis `rknn/` (`alpha-300.rknn`, `mon_YOLOv84.rknn`, `Version6.rknn`, etc.).
-- Initialise la caméra connectée à la ROCK 5B.
-- Effectue le pré‑traitement des frames (redimensionnement, normalisation).
-- Lance l’inférence sur le NPU via le runtime RKNN.
-- Affiche ou renvoie les détections (boîtes, labels, scores).
-
-### `mainPC.py`
-
-Script d’inférence sur PC.
-
-- Charge un modèle YOLOv8 au format PyTorch (`.pt`) ou ONNX (`.onnx`).
-- Lit un flux caméra ou des fichiers vidéo/images.
-- Applique le pipeline de pré/post‑traitement pour la détection de personnes.
 
 ### `requirements.txt`
 
@@ -201,7 +174,7 @@ Adapte les chemins à ton organisation réelle (dossier images, labels, etc.).
   - `alpha-300.rknn`
   - `mon_YOLOv84.rknn`
   - `Version6.rknn`
-- Chargés par `main.py` et `backend_ws_rknn.py` pour l’inférence sur le NPU.
+- Chargés par `backend_ws_rknn.py` pour l’inférence sur le NPU.
 
 ### `runs/detect/models/mon_YOLOv8*`
 
@@ -309,9 +282,7 @@ La partie **acquisition des données** (câblage de la caméra, configuration I�
    - Convertit les `.npy` en images annotables via `scripts/convert_npy_to_png.py`.
    - Entraîne un modèle YOLOv8 sur ces images (`scripts/train.py`).
    - Exporte le modèle vers ONNX puis RKNN.
-   - Déploie le modèle pour la détection de personnes :
-     - sur PC (`mainPC.py`) ;
-     - sur ROCK 5B (`main.py` ou `server/backend_ws_rknn.py`).
+   - Déploie le modèle pour la détection de personnes.
 
 En résumé : **MLX90640BAA** gère la **connexion et la lecture de la caméra**, tandis que **Human_detection_rock5b** gère la **détection de personnes à partir des images/frames produites**.
 
@@ -336,16 +307,12 @@ En résumé : **MLX90640BAA** gère la **connexion et la lecture de la caméra**
    - Convertir le modèle ONNX en RKNN (`scripts/convert_to_rknn.py`).
 
 5. **Déploiement / inférence**
-   - Sur PC : `mainPC.py` avec modèle `.pt` ou `.onnx`.
+   - Sur PC : `test_inference_PC.py` avec modèle `.pt` ou `.onnx`.
    - Sur ROCK 5B :
-     - `main.py` pour l’inférence locale,
-     - ou `server/backend_ws_rknn.py` pour une API réseau.
+     - `test_inference_rock5b.py` pour l’inférence locale,
+     - `server/backend_ws_rknn.py` pour une API réseau.
 
 ---
 
-## Captures d’écran
 
-Les fichiers `Screenshot_*.png` et `screen_entrainement.png` illustrent :
-- l’entraînement YOLOv8 (courbes de performance, matrices de confusion, etc.) ;
-- des exemples de détection sur des images ou flux vidéo.
 

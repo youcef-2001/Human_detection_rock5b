@@ -132,7 +132,7 @@ def main():
     parser.add_argument("--model", type=str, default=str(MODEL_PATH))
     parser.add_argument("--conf", type=float, default=0.75)
     parser.add_argument("--iou", type=float, default=0.45)
-    parser.add_argument("--out", type=str, default="results/result.jpg")
+    parser.add_argument("--out", type=str, default="results/result_rock5b_inference.jpg")
     args = parser.parse_args()
 
     # Charger image (320x240)
