@@ -143,7 +143,7 @@ def main():
     rknn.config(target_platform="rk3588")
 
     # Charger le modèle ONNX (pas .rknn) pour le simulateur PC
-    ret = rknn.load_onnx(model=args.model)
+    ret = rknn.load_onnx(args.model)
     if ret != 0:
         raise RuntimeError("load_onnx a échoué")
 

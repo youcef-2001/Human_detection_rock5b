@@ -4,6 +4,7 @@
 ### Autre requirements installer via les instructions de la documentation
 ### Requirements additionnels
 
+onnx==1.16.2
 onnxscript==0.2.1
 ultralytics==8.4.16
 websockets==14.1
