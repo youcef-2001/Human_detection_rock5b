@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from ..models import db, Scenario, ESPNode, ScenarioESPNode
+from ..models import db, Scenario, ESPNode, ScenarioESPNode, User
 
 scenarios_bp = Blueprint("scenarios", __name__, url_prefix="/api/scenarios")
 
@@ -23,6 +23,13 @@ def list_scenarios():
     """
     try:
         query = Scenario.query
+
+        username = request.args.get("username", type=str)
+        if username:
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                return jsonify([]), 200
+            query = query.filter_by(user_id=user.id)
         
         # Filter by active status if specified
         is_active = request.args.get("is_active", type=lambda x: x.lower() == "true")
@@ -85,16 +92,35 @@ def create_scenario():
         name = data.get("name")
         if not name:
             return jsonify({"error": "name is required"}), 400
+
+        username = data.get("username")
+        user = None
+        if username:
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                return jsonify({"error": f"User '{username}' not found"}), 404
         
-        # Check if scenario with this name already exists
-        existing = Scenario.query.filter_by(name=name).first()
+        # Check if scenario with this name already exists (user-scoped when username is provided)
+        duplicate_query = Scenario.query.filter_by(name=name)
+        if user:
+            duplicate_query = duplicate_query.filter_by(user_id=user.id)
+        existing = duplicate_query.first()
         if existing:
             return jsonify({"error": f"Scenario with name '{name}' already exists"}), 409
         
         scenario = Scenario(
+            user_id=user.id if user else None,
             name=name,
             description=data.get("description"),
-            is_active=data.get("is_active", True)
+            is_active=data.get("is_active", True),
+            icon_code=data.get("icon_code"),
+            color_value=data.get("color_value"),
+            start_hour=data.get("start_hour"),
+            start_minute=data.get("start_minute"),
+            end_hour=data.get("end_hour"),
+            end_minute=data.get("end_minute"),
+            target_temp=float(data["target_temp"]) if data.get("target_temp") is not None else None,
+            use_time_limit=bool(data.get("use_time_limit", True)),
         )
         
         # Add ESP nodes if specified
@@ -148,6 +174,30 @@ def update_scenario(scenario_id):
         
         if "is_active" in data:
             scenario.is_active = bool(data["is_active"])
+
+        if "icon_code" in data:
+            scenario.icon_code = data["icon_code"]
+
+        if "color_value" in data:
+            scenario.color_value = data["color_value"]
+
+        if "start_hour" in data:
+            scenario.start_hour = data["start_hour"]
+
+        if "start_minute" in data:
+            scenario.start_minute = data["start_minute"]
+
+        if "end_hour" in data:
+            scenario.end_hour = data["end_hour"]
+
+        if "end_minute" in data:
+            scenario.end_minute = data["end_minute"]
+
+        if "target_temp" in data:
+            scenario.target_temp = float(data["target_temp"]) if data["target_temp"] is not None else None
+
+        if "use_time_limit" in data:
+            scenario.use_time_limit = bool(data["use_time_limit"])
         
         # Update ESP nodes if specified
         if "esp_node_ids" in data:

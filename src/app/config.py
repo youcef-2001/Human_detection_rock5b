@@ -1,15 +1,22 @@
 """Configuration settings for the Flask application."""
 
 import os
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
+
+logger = logging.getLogger(__name__)
+
 # Load .env file from src directory
 env_path = Path(__file__).parent.parent / ".env"
-if not env_path.exists():
-    raise RuntimeError(f"Missing required environment file: {env_path}")
-
-load_dotenv(env_path)
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    logger.warning(
+        "No .env file found at %s. Falling back to process environment/defaults.",
+        env_path,
+    )
 
 
 def _get_required_env(name: str) -> str:
@@ -48,7 +55,9 @@ def _resolve_database_url() -> str:
     "postgres", replace it with localhost so Postgres exposed by docker-compose
     remains reachable.
     """
-    database_url = _get_required_env("DATABASE_URL")
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if not database_url:
+        return "sqlite:///human_detection.db"
 
     if not _is_running_in_docker() and "@postgres:" in database_url:
         return database_url.replace("@postgres:", "@localhost:", 1)
