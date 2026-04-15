@@ -17,6 +17,7 @@ from .controllers import (
     scenarios_bp,
     auth_bp,
     users_bp,
+    network_bp,
 )
 from .controllers.inference_controller import init_inference_service
 from .services import InferenceService, WebSocketService
@@ -98,6 +99,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
     app.register_blueprint(scenarios_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(network_bp)
     logger.info("Blueprints registered")
     
     # Initialize WebSocket service
