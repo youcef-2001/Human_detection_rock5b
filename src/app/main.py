@@ -21,18 +21,12 @@ def run(host: str = "0.0.0.0", port: int = 5000, debug: bool = False) -> None:
         debug: Enable Flask debug mode.
     """
     config = get_config()
-    app, inference_service, ws_service = create_app(config)
+    app, inference_service = create_app(config)
     
-    # Start WebSocket service
-    try:
-        ws_service.start()
-    except Exception as e:
-        logger.warning(f"WebSocket service start failed: {e}")
     
     def shutdown_handler(signum, frame):
         """Handle shutdown signals gracefully."""
         logger.info("Shutdown signal received")
-        ws_service.stop()
         inference_service.release()
         sys.exit(0)
     
@@ -48,7 +42,6 @@ def run(host: str = "0.0.0.0", port: int = 5000, debug: bool = False) -> None:
         logger.error(f"Server error: {e}")
         raise
     finally:
-        ws_service.stop()
         inference_service.release()
 
 
