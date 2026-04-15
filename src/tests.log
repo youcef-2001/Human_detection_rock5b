@@ -1,0 +1,44 @@
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+INFO     src.app:__init__.py:36 Creating Flask app with config: TestingConfig
+INFO     src.app:__init__.py:42 Inference service initialized
+INFO     src.app:__init__.py:50 Blueprints registered
+WARNING  src.app.services.websocket_service:websocket_service.py:185 Invalid JSON payload
+WARNING  src.app.services.websocket_service:websocket_service.py:155 Invalid binary payload size

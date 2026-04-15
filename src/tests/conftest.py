@@ -6,8 +6,8 @@ import pytest
 import numpy as np
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project root to path so ``src`` package is importable.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.app.config import TestingConfig
 

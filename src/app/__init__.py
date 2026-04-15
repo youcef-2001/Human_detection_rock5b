@@ -37,12 +37,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
     
     # Initialize inference service
     try:
-        inference_service = InferenceService(
-            rknn_model_path=config.RKNN_MODEL_PATH,
-            onnx_model_path=config.ONNX_MODEL_PATH,
-            conf_threshold=config.CONFIDENCE_THRESHOLD,
-            iou_threshold=config.IOU_THRESHOLD,
-        )
+        inference_service = InferenceService()
         init_inference_service(inference_service)
         logger.info("Inference service initialized")
     except Exception as e:

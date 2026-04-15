@@ -1,8 +1,8 @@
-version: '3.8'
-
 services:
   api:
-    build: .
+    build:
+      context: ..
+      dockerfile: src/Dockerfile
     container_name: human-detection-api
     ports:
       - "5000:5000"
@@ -10,13 +10,37 @@ services:
       FLASK_ENV: production
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       ESP32_WS_URI: ${ESP32_WS_URI:-ws://10.28.26.7:81/}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-human_user}:${POSTGRES_PASSWORD:-human_pass}@postgres:5432/${POSTGRES_DB:-human_detection}
     volumes:
-      - ./rknn:/app/rknn:ro
-      - ./onnx:/app/onnx:ro
+      - ../rknn:/app/rknn:ro
+      - ../onnx:/app/onnx:ro
+      - /volumes/data/app:/volumes/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: human-detection-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-human_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-human_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-human_detection}
+    ports:
+      - "5432:5432"
+    volumes:
+      - /volumes/data/postgresql:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-human_user} -d ${POSTGRES_DB:-human_detection}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped

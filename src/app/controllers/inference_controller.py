@@ -1,13 +1,14 @@
 """Inference controller for human/hot object detection API."""
 
+import json
 import logging
-from io import BytesIO
 
 import cv2
 import numpy as np
 from flask import Blueprint, request, jsonify
 
 from ..services import InferenceService
+from ..services.inference_service import decode_npy_payload
 
 
 logger = logging.getLogger(__name__)
@@ -52,37 +53,58 @@ def detect():
     if _inference_service is None:
         logger.error("Inference service not initialized")
         return jsonify({"error": "Service not available"}), 500
-    
-    # Validate request
-    if "image" not in request.files:
-        return jsonify({"error": "Missing 'image' file"}), 400
-    
-    file = request.files["image"]
-    if file.filename == "":
-        return jsonify({"error": "No file selected"}), 400
+
+    if hasattr(_inference_service, "is_available") and not _inference_service.is_available():
+        detail = (
+            _inference_service.get_init_error()
+            if hasattr(_inference_service, "get_init_error")
+            else "Inference backend unavailable"
+        )
+        return jsonify({"error": detail, "success": False}), 503
     
     try:
-        # Read and decode image
-        file_data = file.read()
-        
-        # Try to load as standard image first
-        try:
+        image = None
+
+        if "image" in request.files:
+            file = request.files["image"]
+            if file.filename == "":
+                return jsonify({"error": "No file selected"}), 400
+
+            file_data = file.read()
+            if not file_data:
+                return jsonify({"error": "Empty file payload"}), 400
+
+            # Try as regular image first.
             nparr = np.frombuffer(file_data, np.uint8)
-            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            
-            if image is None:
-                raise ValueError("Failed to decode image")
-        except Exception:
-            # Fall back to raw thermal data
-            if len(file_data) % 4 != 0:
-                return jsonify({"error": "Invalid thermal data format"}), 400
-            
-            arr = np.frombuffer(file_data, dtype="<f4")
-            if arr.size != 32 * 24:
+            decoded = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if decoded is not None:
+                image = decoded
+            else:
+                # Fall back to thermal payload (raw float32 or npy bytes).
+                try:
+                    image = decode_npy_payload(file_data)
+                except ValueError as decode_error:
+                    return jsonify({"error": str(decode_error)}), 400
+                if image.size != 32 * 24:
+                    return jsonify(
+                        {"error": f"Expected 768 float32 values, got {image.size}"}
+                    ), 400
+
+        elif request.is_json:
+            # Support websocket-like JSON payload for easier API integrations.
+            payload = request.get_json(silent=True)
+            if payload is None:
+                return jsonify({"error": "Invalid JSON payload"}), 400
+            try:
+                image = decode_npy_payload(json.dumps(payload))
+            except ValueError as decode_error:
+                return jsonify({"error": str(decode_error)}), 400
+            if image.size != 32 * 24:
                 return jsonify(
-                    {"error": f"Expected 768 float32 values, got {arr.size}"}
+                    {"error": f"Expected 768 float32 values, got {image.size}"}
                 ), 400
-            image = arr.reshape((24, 32))
+        else:
+            return jsonify({"error": "Missing 'image' file or JSON payload"}), 400
         
         # Run inference
         result = _inference_service.infer(image)

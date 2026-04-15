@@ -43,7 +43,7 @@ Flask web application for human and hot object detection using RKNN (RK3588 NPU)
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - For RK3588: RKNN toolkit2 installed (separate)
 - For x86/x64: ONNX Runtime (included in requirements)
 

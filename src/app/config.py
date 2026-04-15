@@ -22,8 +22,9 @@ class Config:
     API_VERSION: str = "1.0.0"
     
     # Model settings
-    RKNN_MODEL_PATH: str = os.path.join(os.path.dirname(__file__), "..", "rknn", "Version6.rknn")
-    ONNX_MODEL_PATH: str = os.path.join(os.path.dirname(__file__), "..", "onnx", "model.onnx")
+    PROJECT_ROOT: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    RKNN_MODEL_PATH: str = os.path.join(PROJECT_ROOT, "rknn", "Version6.rknn")
+    ONNX_MODEL_PATH: str = os.path.join(PROJECT_ROOT, "onnx", "model.onnx")
     
     # Inference settings
     CONFIDENCE_THRESHOLD: float = 0.35
@@ -31,7 +32,7 @@ class Config:
     IMG_SIZE: int = 320
     
     # WebSocket settings
-    ESP32_WS_URI: str = os.environ.get("ESP32_WS_URI", "ws://10.28.26.7:81/")
+    ESP32_WS_URI: str = os.environ.get("ESP32_WS_URI", "ws://10.105.139.24:81/")
     WS_RECONNECT_DELAY: int = 2  # seconds
     WS_MAX_SIZE: int = None  # unlimited
 

@@ -2,7 +2,7 @@
 Human Detection API - Project Structure
 ========================================
 
-Human_detection_rock5b/
+src/
 │
 ├── app/                                   # Main Flask application package
 │   ├── __init__.py                       # Flask factory (create_app)
@@ -35,33 +35,14 @@ Human_detection_rock5b/
 │   ├── test_websocket_service.py         # WebSocket decode tests
 │   └── test_integration.py               # End-to-end workflow tests
 │
-├── rknn/                                 # RKNN models directory (NPU)
-│   └── Version6.rknn                    # RK3588 model
-│
-├── onnx/                                 # ONNX models directory (CPU)
-│   └── model.onnx                       # CPU inference model
-│
-├── dataset/                              # Training dataset
-│   ├── data.yaml
-│   ├── images/
-│   └── labels/
-│
-├── dataset_npy/                          # Thermal frame samples
-│   └── frame_*.npy
-│
-├── scripts/                              # Utility scripts
-│   └── backend_ws_rknn.py               # Original WebSocket backend
 │
 ├── run.py                                # Application launcher
-├── requirements.txt                      # Python dependencies
 ├── pytest.ini                            # Pytest configuration
 ├── Makefile                              # Development commands
 ├── Dockerfile                            # Container image
 ├── docker-compose.yml                    # Multi-container setup
 ├── .env.example                          # Environment variables template
-├── .gitignore                            # Git exclusions
-├── API_README.md                         # Comprehensive API documentation
-└── README.md                             # Original project readme
+└── API_README.md                         # Comprehensive API documentation
 
 
 ARCHITECTURE PATTERNS
