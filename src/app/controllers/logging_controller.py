@@ -1,12 +1,13 @@
 """Controllers for Logging/Audit management."""
 
+import logging
 from flask import Blueprint, request, jsonify
 from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime
 
 from ..models import db, Logging
 
 logging_bp = Blueprint("logging", __name__, url_prefix="/api/logging")
+logger = logging.getLogger(__name__)
 
 
 @logging_bp.route("", methods=["GET"])
@@ -36,6 +37,7 @@ def list_logs():
         
         # Order by created_at descending (newest first)
         logs = query.order_by(Logging.created_at.desc()).limit(limit).offset(offset).all()
+        logger.info("Listed audit logs count=%s log_type=%s", len(logs), log_type)
         
         return jsonify([log.to_dict() for log in logs]), 200
     except SQLAlchemyError as e:
@@ -57,6 +59,7 @@ def get_log(log_id):
         log = Logging.query.get(log_id)
         if not log:
             return jsonify({"error": "Log record not found"}), 404
+        logger.info("Fetched audit log id=%s type=%s", log.id, log.log_type)
         return jsonify(log.to_dict()), 200
     except SQLAlchemyError as e:
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -100,6 +103,7 @@ def create_log():
         
         db.session.add(log)
         db.session.commit()
+        logger.info("Created audit log id=%s type=%s", log.id, log.log_type)
         
         return jsonify(log.to_dict()), 201
     except SQLAlchemyError as e:
@@ -144,6 +148,7 @@ def update_log(log_id):
             log.concerned_column = data["concerned_column"]
         
         db.session.commit()
+        logger.info("Updated audit log id=%s type=%s", log.id, log.log_type)
         return jsonify(log.to_dict()), 200
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -168,6 +173,7 @@ def delete_log(log_id):
         
         db.session.delete(log)
         db.session.commit()
+        logger.info("Deleted audit log id=%s type=%s", log.id, log.log_type)
         return jsonify({"message": f"Log record {log_id} deleted successfully"}), 200
     except SQLAlchemyError as e:
         db.session.rollback()

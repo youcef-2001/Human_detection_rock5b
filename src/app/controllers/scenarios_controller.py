@@ -1,11 +1,13 @@
 """Controllers for Scenario management."""
 
+import logging
 from flask import Blueprint, request, jsonify
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from ..models import db, Scenario, ESPNode, ScenarioESPNode
 
 scenarios_bp = Blueprint("scenarios", __name__, url_prefix="/api/scenarios")
+logger = logging.getLogger(__name__)
 
 
 @scenarios_bp.route("", methods=["GET"])
@@ -35,6 +37,7 @@ def list_scenarios():
         
         # Order by name
         scenarios = query.order_by(Scenario.name).limit(limit).offset(offset).all()
+        logger.info("Listed scenarios count=%s is_active_filter=%s", len(scenarios), is_active)
         
         return jsonify([scenario.to_dict() for scenario in scenarios]), 200
     except SQLAlchemyError as e:
@@ -56,6 +59,7 @@ def get_scenario(scenario_id):
         scenario = Scenario.query.get(scenario_id)
         if not scenario:
             return jsonify({"error": "Scenario not found"}), 404
+        logger.info("Fetched scenario id=%s name=%s", scenario.id, scenario.name)
         return jsonify(scenario.to_dict()), 200
     except SQLAlchemyError as e:
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -106,6 +110,7 @@ def create_scenario():
         
         db.session.add(scenario)
         db.session.commit()
+        logger.info("Created scenario id=%s name=%s nodes=%s", scenario.id, scenario.name, len(scenario.esp_nodes))
         
         return jsonify(scenario.to_dict()), 201
     except IntegrityError:
@@ -145,6 +150,15 @@ def update_scenario(scenario_id):
         
         if "description" in data:
             scenario.description = data["description"]
+
+        if "name" in data:
+            new_name = data["name"].strip() if isinstance(data["name"], str) else data["name"]
+            if not new_name:
+                return jsonify({"error": "name cannot be empty"}), 400
+            existing = Scenario.query.filter(Scenario.name == new_name, Scenario.id != scenario_id).first()
+            if existing:
+                return jsonify({"error": f"Scenario with name '{new_name}' already exists"}), 409
+            scenario.name = new_name
         
         if "is_active" in data:
             scenario.is_active = bool(data["is_active"])
@@ -161,6 +175,7 @@ def update_scenario(scenario_id):
                     scenario.esp_nodes.append(node)
         
         db.session.commit()
+        logger.info("Updated scenario id=%s name=%s active=%s nodes=%s", scenario.id, scenario.name, scenario.is_active, len(scenario.esp_nodes))
         return jsonify(scenario.to_dict()), 200
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -185,6 +200,7 @@ def delete_scenario(scenario_id):
         
         db.session.delete(scenario)
         db.session.commit()
+        logger.info("Deleted scenario id=%s name=%s", scenario.id, scenario.name)
         return jsonify({"message": f"Scenario {scenario_id} deleted successfully"}), 200
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -223,6 +239,7 @@ def add_esp_node_to_scenario(scenario_id):
         if node not in scenario.esp_nodes:
             scenario.esp_nodes.append(node)
             db.session.commit()
+            logger.info("Added node id=%s to scenario id=%s", node.id, scenario.id)
         
         return jsonify(scenario.to_dict()), 200
     except SQLAlchemyError as e:
@@ -254,6 +271,7 @@ def remove_esp_node_from_scenario(scenario_id, esp_node_id):
         if node in scenario.esp_nodes:
             scenario.esp_nodes.remove(node)
             db.session.commit()
+            logger.info("Removed node id=%s from scenario id=%s", node.id, scenario.id)
         
         return jsonify(scenario.to_dict()), 200
     except SQLAlchemyError as e:

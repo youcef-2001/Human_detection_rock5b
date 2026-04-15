@@ -1,5 +1,6 @@
 """Controllers for Temperature data management."""
 
+import logging
 from flask import Blueprint, request, jsonify
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from datetime import datetime
@@ -7,6 +8,7 @@ from datetime import datetime
 from ..models import db, Temperature, ESPNode
 
 temperatures_bp = Blueprint("temperatures", __name__, url_prefix="/api/temperatures")
+logger = logging.getLogger(__name__)
 
 
 @temperatures_bp.route("", methods=["GET"])
@@ -36,6 +38,7 @@ def list_temperatures():
         
         # Order by measured_at descending (newest first)
         temperatures = query.order_by(Temperature.measured_at.desc()).limit(limit).offset(offset).all()
+        logger.info("Listed temperatures count=%s esp_node_id=%s", len(temperatures), esp_node_id)
         
         return jsonify([temp.to_dict() for temp in temperatures]), 200
     except SQLAlchemyError as e:
@@ -57,6 +60,7 @@ def get_temperature(temp_id):
         temp = Temperature.query.get(temp_id)
         if not temp:
             return jsonify({"error": "Temperature record not found"}), 404
+        logger.info("Fetched temperature id=%s esp_node_id=%s", temp.id, temp.esp_node_id)
         return jsonify(temp.to_dict()), 200
     except SQLAlchemyError as e:
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -109,6 +113,7 @@ def create_temperature():
         
         db.session.add(temp)
         db.session.commit()
+        logger.info("Created temperature id=%s esp_node_id=%s event_key=%s", temp.id, temp.esp_node_id, temp.event_key)
         
         return jsonify(temp.to_dict()), 201
     except IntegrityError:
@@ -157,6 +162,7 @@ def update_temperature(temp_id):
                 return jsonify({"error": "Invalid measured_at format. Use ISO 8601 format"}), 400
         
         db.session.commit()
+        logger.info("Updated temperature id=%s esp_node_id=%s", temp.id, temp.esp_node_id)
         return jsonify(temp.to_dict()), 200
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -183,6 +189,7 @@ def delete_temperature(temp_id):
         
         db.session.delete(temp)
         db.session.commit()
+        logger.info("Deleted temperature id=%s esp_node_id=%s", temp.id, temp.esp_node_id)
         return jsonify({"message": f"Temperature record {temp_id} deleted successfully"}), 200
     except SQLAlchemyError as e:
         db.session.rollback()

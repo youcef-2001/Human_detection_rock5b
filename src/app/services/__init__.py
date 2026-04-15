@@ -5,11 +5,13 @@ from .inference_service import (
     HumanDetectorNPU,
     HumanDetectorCPU,
 )
-from .websocket_service import WebSocketService
+from .websocket_service import WebSocketService, ESPNetworkScanner, ESPFleetWebSocketService
 
 __all__ = [
     "InferenceService",
     "HumanDetectorNPU",
     "HumanDetectorCPU",
     "WebSocketService",
+    "ESPNetworkScanner",
+    "ESPFleetWebSocketService",
 ]

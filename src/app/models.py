@@ -1,9 +1,14 @@
 """Database models for the Human Detection API."""
 
 from datetime import datetime
+import uuid
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.postgresql import INET
 
 db = SQLAlchemy()
+
+# Keep portability for tests (SQLite) while binding as INET on PostgreSQL.
+IP_ADDRESS_TYPE = db.String(50).with_variant(INET(), "postgresql")
 
 
 class ESPNode(db.Model):
@@ -12,9 +17,11 @@ class ESPNode(db.Model):
     __tablename__ = "esp_nodes"
     
     id = db.Column(db.Integer, primary_key=True)
-    ip_address = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    node_uid = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: uuid.uuid4().hex)
+    ip_address = db.Column(IP_ADDRESS_TYPE, unique=True, nullable=False, index=True)
     room_name = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
     temperatures = db.relationship("Temperature", back_populates="esp_node", cascade="all, delete-orphan")
@@ -27,9 +34,11 @@ class ESPNode(db.Model):
         """Convert to dictionary."""
         return {
             "id": self.id,
+            "node_uid": self.node_uid,
             "ip_address": self.ip_address,
             "room_name": self.room_name,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 
@@ -51,6 +60,7 @@ class Temperature(db.Model):
     # Indexes for performance
     __table_args__ = (
         db.Index("ix_temperatures_node_measured", "esp_node_id", "measured_at"),
+        db.Index("ix_temperatures_created_at", "created_at"),
     )
     
     def __repr__(self):
@@ -77,7 +87,7 @@ class Logging(db.Model):
     log_type = db.Column(db.String(50), nullable=False, index=True)  # 'user' or 'system'
     action_log = db.Column(db.Text, nullable=False)
     concerned_column = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
     
     def __repr__(self):
         return f"<Logging {self.log_type}: {self.action_log[:50]}...>"
@@ -102,7 +112,8 @@ class Scenario(db.Model):
     name = db.Column(db.String(255), unique=True, nullable=False, index=True)
     description = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
     esp_nodes = db.relationship("ESPNode", secondary="scenario_esp_nodes", back_populates="scenarios")
@@ -118,7 +129,8 @@ class Scenario(db.Model):
             "description": self.description,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "esp_nodes": [node.to_dict() for node in self.esp_nodes]
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "esp_nodes": [node.to_dict() for node in getattr(self, "esp_nodes", [])]
         }
 
 

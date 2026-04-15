@@ -22,6 +22,30 @@ class TestESPNodesAPI:
         data = response.get_json()
         assert isinstance(data, list)
         assert len(data) == 0
+
+    def test_network_search_endpoint(self, client):
+        """Test network search endpoint returns valid payload."""
+        response = client.get('/api/esp-nodes/network-search?subnet=127.0.0.1/32')
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert 'count' in payload
+        assert 'nodes' in payload
+        assert isinstance(payload['nodes'], list)
+
+    def test_register_discovered_endpoint(self, client):
+        """Test registering discovered nodes in one request."""
+        response = client.post('/api/esp-nodes/register-discovered', json={
+            "ips": ["10.10.10.11", "10.10.10.12"]
+        })
+        assert response.status_code == 201
+        payload = response.get_json()
+        assert payload['count'] == 2
+
+        list_response = client.get('/api/esp-nodes')
+        nodes = list_response.get_json()
+        ips = {node['ip_address'] for node in nodes}
+        assert "10.10.10.11" in ips
+        assert "10.10.10.12" in ips
     
     def test_create_node_success(self, create_esp_node):
         """Test creating a new ESP node."""
@@ -29,9 +53,13 @@ class TestESPNodesAPI:
         
         assert status == 201
         assert node['id'] == 1
+        assert 'node_uid' in node
+        assert isinstance(node['node_uid'], str)
+        assert len(node['node_uid']) >= 16
         assert node['ip_address'] == "192.168.1.100"
         assert node['room_name'] == "Living Room"
         assert 'created_at' in node
+        assert 'updated_at' in node
     
     def test_create_multiple_nodes(self, create_esp_node, client):
         """Test creating multiple ESP nodes."""
@@ -42,6 +70,7 @@ class TestESPNodesAPI:
         assert status2 == 201
         assert node1['id'] == 1
         assert node2['id'] == 2
+        assert node1['node_uid'] != node2['node_uid']
         
         # Verify both are in list
         response = client.get('/api/esp-nodes')
@@ -125,3 +154,18 @@ class TestESPNodesAPI:
         """Test deleting non-existent node."""
         response = client.delete('/api/esp-nodes/9999')
         assert response.status_code == 404
+
+    def test_delete_node_cascades_temperatures(self, create_esp_node, create_temperature, client):
+        """Deleting an ESP node should also remove linked temperatures from DB."""
+        node, status = create_esp_node("10.0.0.50", "Server Room")
+        assert status == 201
+
+        create_temperature(node['id'], event_key="server_room_t1", temperature=23.0)
+        create_temperature(node['id'], event_key="server_room_t2", temperature=24.1)
+
+        response = client.delete(f'/api/esp-nodes/{node["id"]}')
+        assert response.status_code == 200
+
+        temps_response = client.get(f'/api/temperatures?esp_node_id={node["id"]}')
+        assert temps_response.status_code == 200
+        assert temps_response.get_json() == []

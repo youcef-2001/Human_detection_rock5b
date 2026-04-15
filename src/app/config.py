@@ -86,6 +86,10 @@ class Config:
     ESP32_WS_URI = _get_required_env("ESP32_WS_URI")
     WS_RECONNECT_DELAY = _get_int_env("WS_RECONNECT_DELAY")
     WS_MAX_SIZE = None  # unlimited
+    NETWORK_SCAN_SUBNET = os.environ.get("NETWORK_SCAN_SUBNET", "") or None
+    AUTO_SCAN_ON_STARTUP = os.environ.get("AUTO_SCAN_ON_STARTUP", "true").lower() == "true"
+    TEMPERATURE_SAVE_INTERVAL_SECONDS = int(os.environ.get("TEMPERATURE_SAVE_INTERVAL_SECONDS", "900"))
+    WS_FLUSH_INTERVAL_SECONDS = int(os.environ.get("WS_FLUSH_INTERVAL_SECONDS", "5"))
     
     # Database settings (from .env)
     SQLALCHEMY_DATABASE_URI = _resolve_database_url()
@@ -93,6 +97,9 @@ class Config:
     
     # Logging
     LOG_LEVEL = _get_required_env("LOG_LEVEL")
+
+    # Demo data
+    ENABLE_SAMPLE_DATA = True
 
 
 class DevelopmentConfig(Config):
@@ -113,6 +120,10 @@ class TestingConfig(Config):
     SECRET_KEY = "test-secret-key"
     ESP32_WS_URI = "ws://localhost:8765/"
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    ENABLE_SAMPLE_DATA = False
+    AUTO_SCAN_ON_STARTUP = False
+    TEMPERATURE_SAVE_INTERVAL_SECONDS = 1
+    WS_FLUSH_INTERVAL_SECONDS = 1
 
 
 def get_config():
