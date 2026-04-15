@@ -1,30 +1,4 @@
 services:
-  api:
-    build:
-      context: ..
-      dockerfile: src/Dockerfile
-    container_name: human-detection-api
-    ports:
-      - "5000:5000"
-    environment:
-      FLASK_ENV: production
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-      ESP32_WS_URI: ${ESP32_WS_URI:-ws://10.28.26.7:81/}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-human_user}:${POSTGRES_PASSWORD:-human_pass}@postgres:5432/${POSTGRES_DB:-human_detection}
-    volumes:
-      - ../rknn:/app/rknn:ro
-      - ../onnx:/app/onnx:ro
-      - /volumes/data/app:/volumes/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   postgres:
     image: postgres:16-alpine
