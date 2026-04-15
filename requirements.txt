@@ -6,6 +6,11 @@
 Flask==2.3.2
 Werkzeug==2.3.6
 python-dotenv==1.0.0
+Flask-SQLAlchemy==3.0.5
+SQLAlchemy==2.0.21
+
+# Database
+psycopg2-binary==2.9.7
 
 # Image Processing
 opencv-python==4.8.0.76
@@ -30,6 +35,7 @@ black==23.7.0
 flake8==6.0.0
 isort==5.12.0
 mypy==1.4.1
+python-dotenv==1.0.0
 
 # Documentation
 sphinx==7.1.2
