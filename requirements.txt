@@ -20,8 +20,12 @@ numpy==1.24.3
 # Model Inference - Core dependencies
 onnx==1.16.2
 onnxscript==0.2.1
-onnxruntime==1.15.1
+onnxruntime==1.24.2
 ultralytics==8.4.16
+
+# For CPU inference  onnx needs latest version of onnxruntime, but for RKNN NPU support, rknn-toolkit2 must be installed separately:
+
+
 
 # WebSocket and Async
 websockets==14.1
@@ -36,7 +40,6 @@ black==23.7.0
 flake8==6.0.0
 isort==5.12.0
 mypy==1.4.1
-python-dotenv==1.0.0
 
 # Documentation
 sphinx==7.1.2
