@@ -1,20 +1,31 @@
 """Unit tests for Flask controllers."""
 
+import base64
 import json
 import pytest
+import numpy as np
 from io import BytesIO
 
 from src.app.config import TestingConfig
 from src.app import create_app
-from src.app.controllers.inference_controller import init_inference_service
-from src.app.services import InferenceService
+
+
+class MockInferenceService:
+    """Simple inference mock for controller tests."""
+
+    def infer(self, _image):
+        return {"human_count": 2, "hot_object_count": 1}
+
+    def release(self):
+        return None
 
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
     """Create Flask app for testing."""
+    monkeypatch.setattr("src.app.InferenceService", lambda: MockInferenceService())
     config = TestingConfig()
-    app, inference_service, ws_service = create_app(config)
+    app, _inference_service, _ws_service = create_app(config)
     app.config['TESTING'] = True
     return app
 
@@ -88,6 +99,19 @@ class TestInferenceController:
             content_type='multipart/form-data'
         )
         assert response.status_code == 400
+
+    def test_inference_endpoint_json_payload(self, client):
+        """Test /inference/detect with JSON thermal payload."""
+        payload = (np.random.uniform(5, 55, (24, 32)).astype("float32")).tobytes()
+        response = client.post(
+            "/inference/detect",
+            json={"float32_base64": base64.b64encode(payload).decode("utf-8")},
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["human_count"] == 2
+        assert data["hot_object_count"] == 1
+        assert data["success"] is True
 
 
 class TestAppInitialization:

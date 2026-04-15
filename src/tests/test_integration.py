@@ -8,13 +8,25 @@ import pytest
 
 from src.app.config import TestingConfig
 from src.app import create_app
+from src.app.services import inference_service as inf
+
+
+class MockInferenceService:
+    """Simple inference mock for integration tests."""
+
+    def infer(self, _image):
+        return {"human_count": 1, "hot_object_count": 0}
+
+    def release(self):
+        return None
 
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
     """Create Flask app for testing."""
+    monkeypatch.setattr("src.app.InferenceService", lambda: MockInferenceService())
     config = TestingConfig()
-    app, inference_service, ws_service = create_app(config)
+    app, _inference_service, _ws_service = create_app(config)
     app.config['TESTING'] = True
     return app
 
@@ -92,13 +104,11 @@ class TestDataPipeline:
     
     def test_thermal_data_preprocessing(self):
         """Test thermal data is preprocessed correctly."""
-        from src.app.services.inference_service import HumanDetectorCPU
-        
         # Create thermal frame
         thermal = np.ones((24, 32), dtype=np.float32) * 30.0
         
         # Convert to BGR
-        bgr = HumanDetectorCPU._thermal_to_bgr(thermal)
+        bgr = inf.thermal_to_bgr(thermal)
         
         # Verify shape and type
         assert bgr.shape == (240, 320, 3)
@@ -107,13 +117,11 @@ class TestDataPipeline:
     
     def test_image_preprocessing_chain(self):
         """Test complete image preprocessing chain."""
-        from src.app.services.inference_service import HumanDetectorCPU
-        
         # Create test image
         image = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
         
         # Apply letterbox
-        boxed, ratio, pad = HumanDetectorCPU._letterbox(image, img_size=320)
+        boxed, ratio, pad = inf.letterbox(image, size=320)
         
         # Verify output
         assert boxed.shape == (320, 320, 3)

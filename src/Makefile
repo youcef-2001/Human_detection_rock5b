@@ -14,7 +14,7 @@ help:
 	@echo "make debug         - Run with debug mode enabled"
 
 install:
-	pip install -r requirements.txt
+	pip install -r ../requirements.txt
 
 test:
 	pytest tests/ -v
