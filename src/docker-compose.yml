@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: human-detection-api
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_ENV: production
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      ESP32_WS_URI: ${ESP32_WS_URI:-ws://10.28.26.7:81/}
+    volumes:
+      - ./rknn:/app/rknn:ro
+      - ./onnx:/app/onnx:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
