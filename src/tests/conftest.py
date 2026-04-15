@@ -9,7 +9,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.config import TestingConfig
+from src.app.config import TestingConfig
 
 
 @pytest.fixture

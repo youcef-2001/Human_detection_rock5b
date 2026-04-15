@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from app.utils.platform_detector import PlatformDetector, InferencePlatform
-from app.services.inference_service import (
+from src.app.utils.platform_detector import PlatformDetector, InferencePlatform
+from src.app.services.inference_service import (
     HumanDetectorCPU,
     HumanDetectorNPU,
 )

@@ -6,7 +6,7 @@ import base64
 import io
 import pytest
 
-from app.services.websocket_service import WebSocketService
+from src.app.services.websocket_service import WebSocketService
 
 
 class TestWebSocketService:

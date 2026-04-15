@@ -6,8 +6,8 @@ from io import BytesIO
 
 import pytest
 
-from app.config import TestingConfig
-from app import create_app
+from src.app.config import TestingConfig
+from src.app import create_app
 
 
 @pytest.fixture
@@ -92,7 +92,7 @@ class TestDataPipeline:
     
     def test_thermal_data_preprocessing(self):
         """Test thermal data is preprocessed correctly."""
-        from app.services.inference_service import HumanDetectorCPU
+        from src.app.services.inference_service import HumanDetectorCPU
         
         # Create thermal frame
         thermal = np.ones((24, 32), dtype=np.float32) * 30.0
@@ -107,7 +107,7 @@ class TestDataPipeline:
     
     def test_image_preprocessing_chain(self):
         """Test complete image preprocessing chain."""
-        from app.services.inference_service import HumanDetectorCPU
+        from src.app.services.inference_service import HumanDetectorCPU
         
         # Create test image
         image = np.random.randint(0, 256, (480, 640, 3), dtype=np.uint8)
