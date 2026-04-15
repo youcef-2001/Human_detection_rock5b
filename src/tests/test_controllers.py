@@ -4,10 +4,10 @@ import json
 import pytest
 from io import BytesIO
 
-from app.config import TestingConfig
-from app import create_app
-from app.controllers.inference_controller import init_inference_service
-from app.services import InferenceService
+from src.app.config import TestingConfig
+from src.app import create_app
+from src.app.controllers.inference_controller import init_inference_service
+from src.app.services import InferenceService
 
 
 @pytest.fixture

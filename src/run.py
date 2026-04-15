@@ -4,7 +4,7 @@
 import os
 import argparse
 
-from app.main import run
+from src.app.main import run
 
 
 def main():
