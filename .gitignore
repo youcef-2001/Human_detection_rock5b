@@ -10,4 +10,5 @@ src/tests.log
 # Keep real environment secrets out of git
 src/.env
 src/.env.*
+src/db/data
 !src/.env.example
