@@ -4,15 +4,44 @@ import logging
 from typing import Optional
 
 from flask import Flask
+from flask_cors import CORS
 
 from .config import get_config, Config
 from .models import db
-from .controllers import hello_bp, inference_bp, esp_nodes_bp, temperatures_bp, logging_bp, scenarios_bp
+from .controllers import (
+    hello_bp,
+    inference_bp,
+    esp_nodes_bp,
+    temperatures_bp,
+    logging_bp,
+    scenarios_bp,
+    auth_bp,
+    users_bp,
+)
 from .controllers.inference_controller import init_inference_service
 from .services import InferenceService, WebSocketService
 
 
 logger = logging.getLogger(__name__)
+
+
+class _UnavailableInferenceService:
+    """Fallback inference service used when model initialization fails."""
+
+    def __init__(self, error_message: str):
+        self._error_message = error_message
+
+    def is_available(self) -> bool:
+        return False
+
+    def get_init_error(self) -> str:
+        return self._error_message
+
+    def infer(self, _image):
+        raise RuntimeError(self._error_message)
+
+    def release(self) -> None:
+        return
 
 
 def create_app(config: Optional[Config] = None) -> Flask:
@@ -30,6 +59,13 @@ def create_app(config: Optional[Config] = None) -> Flask:
     
     app = Flask(__name__)
     app.config.from_object(config)
+
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": "*"}},
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
     
     # Configure logging
     _setup_logging()
@@ -48,8 +84,10 @@ def create_app(config: Optional[Config] = None) -> Flask:
         init_inference_service(inference_service)
         logger.info("Inference service initialized")
     except Exception as e:
-        logger.error(f"Failed to initialize inference service: {e}")
-        raise
+        error_message = f"Inference initialization failed: {e}"
+        logger.warning(error_message)
+        inference_service = _UnavailableInferenceService(error_message)
+        init_inference_service(inference_service)
     
     # Register blueprints
     app.register_blueprint(hello_bp)
@@ -58,6 +96,8 @@ def create_app(config: Optional[Config] = None) -> Flask:
     app.register_blueprint(temperatures_bp)
     app.register_blueprint(logging_bp)
     app.register_blueprint(scenarios_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(users_bp)
     logger.info("Blueprints registered")
     
     # Initialize WebSocket service
