@@ -20,29 +20,10 @@ from .controllers import (
     network_bp,
 )
 from .controllers.inference_controller import init_inference_service
-from .services import InferenceService, WebSocketService
+from .services import InferenceService
 
 
 logger = logging.getLogger(__name__)
-
-
-class _UnavailableInferenceService:
-    """Fallback inference service used when model initialization fails."""
-
-    def __init__(self, error_message: str):
-        self._error_message = error_message
-
-    def is_available(self) -> bool:
-        return False
-
-    def get_init_error(self) -> str:
-        return self._error_message
-
-    def infer(self, _image):
-        raise RuntimeError(self._error_message)
-
-    def release(self) -> None:
-        return
 
 
 def create_app(config: Optional[Config] = None) -> Flask:
@@ -81,14 +62,12 @@ def create_app(config: Optional[Config] = None) -> Flask:
     
     # Initialize inference service
     try:
-        inference_service = InferenceService()
+        inference_service = InferenceService(config.RKNN_MODEL_PATH, config.ONNX_MODEL_PATH, config.CONFIDENCE_THRESHOLD, config.IOU_THRESHOLD)
         init_inference_service(inference_service)
         logger.info("Inference service initialized")
     except Exception as e:
         error_message = f"Inference initialization failed: {e}"
         logger.warning(error_message)
-        inference_service = _UnavailableInferenceService(error_message)
-        init_inference_service(inference_service)
     
     # Register blueprints
     app.register_blueprint(hello_bp)
@@ -101,9 +80,6 @@ def create_app(config: Optional[Config] = None) -> Flask:
     app.register_blueprint(users_bp)
     app.register_blueprint(network_bp)
     logger.info("Blueprints registered")
-    
-    # Initialize WebSocket service
-    ws_service = WebSocketService(uri=config.ESP32_WS_URI)
     
     @app.before_request
     def before_request():
@@ -126,7 +102,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
         """
         return {"status": "healthy"}, 200
     
-    return app, inference_service, ws_service
+    return app, inference_service
 
 
 def _setup_logging() -> None:

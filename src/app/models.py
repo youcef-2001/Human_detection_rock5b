@@ -2,9 +2,11 @@
 
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.postgresql import INET
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
+IP_ADDRESS_TYPE = db.String(50).with_variant(INET(), "postgresql")
 
 
 class User(db.Model):
@@ -53,7 +55,7 @@ class ESPNode(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    ip_address = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    ip_address = db.Column(IP_ADDRESS_TYPE, unique=True, nullable=False, index=True)
     room_name = db.Column(db.String(255), nullable=True)
     camera_url = db.Column(db.String(1024), nullable=True)
     color_hex = db.Column(db.String(16), nullable=True)
