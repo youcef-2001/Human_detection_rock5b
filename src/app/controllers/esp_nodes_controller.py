@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from datetime import datetime
 
-from ..models import db, ESPNode
+from ..models import db, ESPNode, User
 
 esp_nodes_bp = Blueprint("esp_nodes", __name__, url_prefix="/api/esp-nodes")
 
@@ -18,7 +18,15 @@ def list_esp_nodes():
         JSON list of ESPNode objects.
     """
     try:
-        nodes = ESPNode.query.all()
+        query = ESPNode.query
+        username = request.args.get("username", type=str)
+        if username:
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                return jsonify([]), 200
+            query = query.filter_by(user_id=user.id)
+
+        nodes = query.order_by(ESPNode.created_at.asc()).all()
         return jsonify([node.to_dict() for node in nodes]), 200
     except SQLAlchemyError as e:
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -65,6 +73,14 @@ def create_esp_node():
         
         ip_address = data.get("ip_address")
         room_name = data.get("room_name")
+        camera_url = data.get("camera_url")
+        color_hex = data.get("color_hex")
+        pos_x = data.get("pos_x", 50.0)
+        pos_y = data.get("pos_y", 50.0)
+        has_camera = bool(data.get("has_camera", True))
+        show_temperature = bool(data.get("show_temperature", True))
+        show_presence = bool(data.get("show_presence", True))
+        username = data.get("username")
         
         if not ip_address:
             return jsonify({"error": "ip_address is required"}), 400
@@ -74,7 +90,24 @@ def create_esp_node():
         if existing:
             return jsonify({"error": f"Node with IP {ip_address} already exists"}), 409
         
-        node = ESPNode(ip_address=ip_address, room_name=room_name)
+        user = None
+        if username:
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                return jsonify({"error": f"User '{username}' not found"}), 404
+
+        node = ESPNode(
+            user_id=user.id if user else None,
+            ip_address=ip_address,
+            room_name=room_name,
+            camera_url=camera_url,
+            color_hex=color_hex,
+            pos_x=float(pos_x),
+            pos_y=float(pos_y),
+            has_camera=has_camera,
+            show_temperature=show_temperature,
+            show_presence=show_presence,
+        )
         db.session.add(node)
         db.session.commit()
         
@@ -114,6 +147,27 @@ def update_esp_node(node_id):
         
         if "room_name" in data:
             node.room_name = data["room_name"]
+
+        if "camera_url" in data:
+            node.camera_url = data["camera_url"]
+
+        if "color_hex" in data:
+            node.color_hex = data["color_hex"]
+
+        if "pos_x" in data:
+            node.pos_x = float(data["pos_x"])
+
+        if "pos_y" in data:
+            node.pos_y = float(data["pos_y"])
+
+        if "has_camera" in data:
+            node.has_camera = bool(data["has_camera"])
+
+        if "show_temperature" in data:
+            node.show_temperature = bool(data["show_temperature"])
+
+        if "show_presence" in data:
+            node.show_presence = bool(data["show_presence"])
         
         db.session.commit()
         return jsonify(node.to_dict()), 200

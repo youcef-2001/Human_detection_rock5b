@@ -1,0 +1,5 @@
+[project]
+name = "human-detection-rock5b"
+version = "0.1.0"
+description = "Human detection API and RKNN tooling"
+requires-python = ">=3.11,<3.12"

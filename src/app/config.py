@@ -1,15 +1,22 @@
 """Configuration settings for the Flask application."""
 
 import os
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
+
+logger = logging.getLogger(__name__)
+
 # Load .env file from src directory
 env_path = Path(__file__).parent.parent / ".env"
-if not env_path.exists():
-    raise RuntimeError(f"Missing required environment file: {env_path}")
-
-load_dotenv(env_path)
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    logger.warning(
+        "No .env file found at %s. Falling back to process environment/defaults.",
+        env_path,
+    )
 
 
 def _get_required_env(name: str) -> str:
@@ -42,13 +49,38 @@ def _is_running_in_docker() -> bool:
 
 def _resolve_database_url() -> str:
     """
-    Resolve database URL from env for both host and container execution.
+    Resolve runtime DB URL and enforce PostgreSQL only.
 
     If the app runs on host and DATABASE_URL points to docker service hostname
-    "postgres", replace it with localhost so Postgres exposed by docker-compose
-    remains reachable.
+    "postgres", replace it with localhost so the same postgres container
+    (and its persisted volume) remains reachable from host execution.
     """
-    database_url = _get_required_env("DATABASE_URL")
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError("Missing required environment variable: DATABASE_URL")
+
+    if not (database_url.startswith("postgresql://") or database_url.startswith("postgresql+")):
+        raise RuntimeError("DATABASE_URL must target PostgreSQL (sqlite is not supported)")
+
+    if not _is_running_in_docker() and "@postgres:" in database_url:
+        return database_url.replace("@postgres:", "@localhost:", 1)
+
+    return database_url
+
+
+def _resolve_test_database_url() -> str:
+    """
+    Resolve test DB URL and enforce PostgreSQL only.
+
+    Tests use a dedicated PostgreSQL database to avoid any sqlite fallback and
+    prevent destructive operations on the main database.
+    """
+    database_url = os.environ.get("TEST_DATABASE_URL", "").strip()
+    if not database_url:
+        raise RuntimeError("Missing required environment variable: TEST_DATABASE_URL")
+
+    if not (database_url.startswith("postgresql://") or database_url.startswith("postgresql+")):
+        raise RuntimeError("TEST_DATABASE_URL must target PostgreSQL (sqlite is not supported)")
 
     if not _is_running_in_docker() and "@postgres:" in database_url:
         return database_url.replace("@postgres:", "@localhost:", 1)
@@ -82,15 +114,9 @@ class Config:
     IOU_THRESHOLD = _get_float_env("IOU_THRESHOLD")
     IMG_SIZE = _get_int_env("IMG_SIZE")
     
-    # WebSocket settings (from .env)
-    ESP32_WS_URI = _get_required_env("ESP32_WS_URI")
-    WS_RECONNECT_DELAY = _get_int_env("WS_RECONNECT_DELAY")
-    WS_MAX_SIZE = None  # unlimited
-    
     # Database settings (from .env)
     SQLALCHEMY_DATABASE_URI = _resolve_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
     # Logging
     LOG_LEVEL = _get_required_env("LOG_LEVEL")
 
@@ -111,8 +137,7 @@ class TestingConfig(Config):
     TESTING = True
     DEBUG = True
     SECRET_KEY = "test-secret-key"
-    ESP32_WS_URI = "ws://localhost:8765/"
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_DATABASE_URI = _resolve_test_database_url()
 
 
 def get_config():

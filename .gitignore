@@ -11,3 +11,6 @@ src/tests.log
 src/.env
 src/.env.*
 !src/.env.example
+src/db/data/*
+.docker
+.venv

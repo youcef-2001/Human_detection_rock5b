@@ -18,3 +18,23 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+    
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: human-detection-postgres-test
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-human_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-human_pass}
+      POSTGRES_DB: ${POSTGRES_TEST_DB:-human_detection_test}
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./db/data/postgresql_test:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-human_user} -d ${POSTGRES_TEST_DB:-human_detection_test}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped

@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 
-from ..models import db, Logging
+from ..models import db, Logging, User
 
 logging_bp = Blueprint("logging", __name__, url_prefix="/api/logging")
 
@@ -24,6 +24,13 @@ def list_logs():
     """
     try:
         query = Logging.query
+
+        username = request.args.get("username", type=str)
+        if username:
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                return jsonify([]), 200
+            query = query.filter_by(user_id=user.id)
         
         # Filter by log type if specified
         log_type = request.args.get("log_type")
@@ -92,7 +99,15 @@ def create_log():
         if log_type not in ["user", "system"]:
             return jsonify({"error": "log_type must be 'user' or 'system'"}), 400
         
+        username = data.get("username")
+        user = None
+        if username:
+            user = User.query.filter_by(username=username).first()
+            if not user:
+                return jsonify({"error": f"User '{username}' not found"}), 404
+
         log = Logging(
+            user_id=user.id if user else None,
             log_type=log_type,
             action_log=action_log,
             concerned_column=data.get("concerned_column")

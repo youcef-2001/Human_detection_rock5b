@@ -4,12 +4,23 @@ import logging
 from typing import Optional
 
 from flask import Flask
+from flask_cors import CORS
 
 from .config import get_config, Config
 from .models import db
-from .controllers import hello_bp, inference_bp, esp_nodes_bp, temperatures_bp, logging_bp, scenarios_bp
+from .controllers import (
+    hello_bp,
+    inference_bp,
+    esp_nodes_bp,
+    temperatures_bp,
+    logging_bp,
+    scenarios_bp,
+    auth_bp,
+    users_bp,
+    network_bp,
+)
 from .controllers.inference_controller import init_inference_service
-from .services import InferenceService, WebSocketService
+from .services import InferenceService
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +41,13 @@ def create_app(config: Optional[Config] = None) -> Flask:
     
     app = Flask(__name__)
     app.config.from_object(config)
+
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": "*"}},
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
     
     # Configure logging
     _setup_logging()
@@ -44,12 +62,12 @@ def create_app(config: Optional[Config] = None) -> Flask:
     
     # Initialize inference service
     try:
-        inference_service = InferenceService()
+        inference_service = InferenceService(config.RKNN_MODEL_PATH, config.ONNX_MODEL_PATH, config.CONFIDENCE_THRESHOLD, config.IOU_THRESHOLD)
         init_inference_service(inference_service)
         logger.info("Inference service initialized")
     except Exception as e:
-        logger.error(f"Failed to initialize inference service: {e}")
-        raise
+        error_message = f"Inference initialization failed: {e}"
+        logger.warning(error_message)
     
     # Register blueprints
     app.register_blueprint(hello_bp)
@@ -58,10 +76,10 @@ def create_app(config: Optional[Config] = None) -> Flask:
     app.register_blueprint(temperatures_bp)
     app.register_blueprint(logging_bp)
     app.register_blueprint(scenarios_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(users_bp)
+    app.register_blueprint(network_bp)
     logger.info("Blueprints registered")
-    
-    # Initialize WebSocket service
-    ws_service = WebSocketService(uri=config.ESP32_WS_URI)
     
     @app.before_request
     def before_request():
@@ -84,7 +102,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
         """
         return {"status": "healthy"}, 200
     
-    return app, inference_service, ws_service
+    return app, inference_service
 
 
 def _setup_logging() -> None:

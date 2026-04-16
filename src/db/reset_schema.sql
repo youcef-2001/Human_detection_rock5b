@@ -1,6 +1,13 @@
--- Initial PostgreSQL schema for Human Detection platform.
+-- Drop tables in correct order
+DROP TABLE IF EXISTS scenario_esp_nodes CASCADE;
+DROP TABLE IF EXISTS temperatures CASCADE;
+DROP TABLE IF EXISTS scenarios CASCADE;
+DROP TABLE IF EXISTS logging CASCADE;
+DROP TABLE IF EXISTS esp_nodes CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
-CREATE TABLE IF NOT EXISTS users (
+-- Recreate with correct schema
+CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     username VARCHAR(120) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -12,10 +19,10 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email);
 
-CREATE TABLE IF NOT EXISTS esp_nodes (
+CREATE TABLE esp_nodes (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT REFERENCES users(id),
     ip_address INET NOT NULL UNIQUE,
@@ -30,9 +37,9 @@ CREATE TABLE IF NOT EXISTS esp_nodes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_esp_nodes_user_id ON esp_nodes(user_id);
+CREATE INDEX idx_esp_nodes_user_id ON esp_nodes(user_id);
 
-CREATE TABLE IF NOT EXISTS temperatures (
+CREATE TABLE temperatures (
     id BIGSERIAL PRIMARY KEY,
     esp_node_id BIGINT NOT NULL REFERENCES esp_nodes(id) ON DELETE CASCADE,
     event_key VARCHAR(255) NOT NULL UNIQUE,
@@ -41,10 +48,9 @@ CREATE TABLE IF NOT EXISTS temperatures (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_temperatures_node_time
-    ON temperatures (esp_node_id, measured_at DESC);
+CREATE INDEX idx_temperatures_node_time ON temperatures (esp_node_id, measured_at DESC);
 
-CREATE TABLE IF NOT EXISTS logging (
+CREATE TABLE logging (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT REFERENCES users(id),
     log_type VARCHAR(50) NOT NULL,
@@ -53,20 +59,28 @@ CREATE TABLE IF NOT EXISTS logging (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_logging_user_id ON logging(user_id);
-CREATE INDEX IF NOT EXISTS idx_logging_log_type ON logging(log_type);
+CREATE INDEX idx_logging_user_id ON logging(user_id);
+CREATE INDEX idx_logging_log_type ON logging(log_type);
 
-CREATE TABLE IF NOT EXISTS scenarios (
+CREATE TABLE scenarios (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT REFERENCES users(id),
     name VARCHAR(255) NOT NULL,
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+    icon_code INTEGER,
+    color_value BIGINT,
+    start_hour INTEGER,
+    start_minute INTEGER,
+    end_hour INTEGER,
+    end_minute INTEGER,
+    target_temp NUMERIC(6, 2),
+    use_time_limit BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_scenarios_user_name UNIQUE (user_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS scenario_esp_nodes (
+CREATE TABLE scenario_esp_nodes (
     scenario_id BIGINT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
     esp_node_id BIGINT NOT NULL REFERENCES esp_nodes(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

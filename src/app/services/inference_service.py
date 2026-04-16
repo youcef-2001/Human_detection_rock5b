@@ -346,22 +346,11 @@ class HumanDetectorCPU:
 class InferenceService:
     """Select and expose the inference backend according to current machine."""
 
-    def __init__(self):
+    def __init__(self,rknn_model,onnx_model,conf,iou):
         """Initialize platform-specific detector using RKNN NPU or simulator CPU."""
         m = _machine_name()
         c = _cpuinfo_text()
 
-        project_root = pathlib.Path(__file__).resolve().parents[3]
-        default_rknn = project_root / "rknn" / "Version6.rknn"
-        preferred_onnx = project_root / "onnx" / "mon_YOLOv86.onnx"
-        fallback_onnx = project_root / "onnx" / "model.onnx"
-
-        rknn_model = pathlib.Path(os.environ.get("RKNN_MODEL_PATH", str(default_rknn)))
-        if preferred_onnx.exists():
-            default_onnx = preferred_onnx
-        else:
-            default_onnx = fallback_onnx
-        onnx_model = pathlib.Path(os.environ.get("ONNX_MODEL_PATH", str(default_onnx)))
 
         self.backend = "unavailable"
         self._init_error: Optional[str] = None
@@ -369,10 +358,10 @@ class InferenceService:
         try:
             if m in ("x86_64", "amd64", "i386", "i686") or "intel" in c or "amd" in c:
                 self.backend = "cpu"
-                self.detector = HumanDetectorCPU(str(onnx_model), 0.75, 0.45)
+                self.detector = HumanDetectorCPU(str(onnx_model), conf, iou)
             elif "rk3588" in c or "rockchip" in c:
                 self.backend = "npu"
-                self.detector = HumanDetectorNPU(str(rknn_model), 0.75, 0.45)
+                self.detector = HumanDetectorNPU(str(rknn_model), conf, iou)
             else:
                 raise RuntimeError(
                     f"Unsupported platform for inference (machine={m}). "
