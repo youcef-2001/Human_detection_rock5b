@@ -6,6 +6,20 @@ import argparse
 import sys
 from pathlib import Path
 
+
+def _ensure_python_311() -> None:
+    """Fail fast when the interpreter is not Python 3.11."""
+    if sys.version_info[:2] != (3, 11):
+        current = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        raise RuntimeError(
+            "This project requires Python 3.11.x. "
+            f"Current interpreter: {current}. "
+            "Create/activate a 3.11 virtual environment and retry."
+        )
+
+
+_ensure_python_311()
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))

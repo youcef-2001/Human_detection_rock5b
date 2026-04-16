@@ -56,6 +56,46 @@ Persistance DB :
 
 ---
 
+## Démarrage rapide (Application superviseur_app)
+
+Pour lancer l'application complète avec le backend Flask et PostgreSQL :
+
+### Terminal 1 - Démarrer PostgreSQL (Docker)
+
+```bash
+cd src
+docker-compose up -d
+```
+
+### Terminal 2 - Démarrer l'API Flask
+
+```bash
+cd .
+(& ".\.venv\Scripts\Activate.ps1")  # Activation virtualenv Windows
+python "src\run.py" --host 0.0.0.0 --port 5000
+```
+
+**Ou avec PowerShell complet :**
+```powershell
+(& "c:\Users\boula\Desktop\Human_detection_rock5b\.venv\Scripts\Activate.ps1") ; python "src\run.py" --host 0.0.0.0 --port 5000
+```
+
+### Terminal 3 - Lancer l'application Flutter
+
+```bash
+cd ../superviseur_app
+flutter run
+```
+
+**Résumé des ports :**
+- API Flask : `http://localhost:5000`
+- PostgreSQL : `localhost:5432`
+- Application Flutter : `http://localhost:54107` (ou autre)
+
+**L'API sera accessible à `http://localhost:5000`** et l'application Flutter s'y connectera automatiquement.
+
+---
+
 ## Get Started 1 - IA RK SDK (démarrage rapide)
 
 Objectif : entraîner/convertir un modèle.
