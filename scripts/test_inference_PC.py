@@ -125,8 +125,8 @@ def main():
     parser.add_argument("--model", type=str, default="onnx/mon_YOLOv86.onnx")
     parser.add_argument("--image", type=str, required=True)
     parser.add_argument("--imgsz", type=int, default=320)
-    parser.add_argument("--conf", type=float, default=0.85)
-    parser.add_argument("--iou", type=float, default=0.45)
+    parser.add_argument("--conf", type=float, default=0.90)
+    parser.add_argument("--iou", type=float, default=0.01)
     parser.add_argument("--out", type=str, default="results/result_pc2.jpg")
     args = parser.parse_args()
 

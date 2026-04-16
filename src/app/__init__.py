@@ -8,6 +8,7 @@ from flask_cors import CORS
 
 from .config import get_config, Config
 from .models import db
+from .schema_compat import ensure_postgres_schema_compat
 from .controllers import (
     hello_bp,
     inference_bp,
@@ -58,6 +59,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        ensure_postgres_schema_compat(db)
         logger.info("Database initialized and tables created")
     
     # Initialize inference service

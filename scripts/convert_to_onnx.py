@@ -23,4 +23,4 @@ def convert_to_onnx(   name='mon_YOLOv86',):
     print(f"ONNX sauvegardé ici: {target_path}")
 
 if __name__ == "__main__":
-    convert_to_onnx()
+    convert_to_onnx("modeleCPU5")

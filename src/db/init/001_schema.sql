@@ -62,9 +62,18 @@ CREATE TABLE IF NOT EXISTS scenarios (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    icon_code INTEGER,
+    color_value BIGINT,
+    start_hour INTEGER,
+    start_minute INTEGER,
+    end_hour INTEGER,
+    end_minute INTEGER,
+    target_temp NUMERIC(6, 2),
+    use_time_limit BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-);
+
+CREATE INDEX IF NOT EXISTS idx_scenarios_user_id ON scenarios(user_id);
 
 CREATE TABLE IF NOT EXISTS scenario_esp_nodes (
     scenario_id BIGINT NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,

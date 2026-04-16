@@ -108,7 +108,7 @@ def detect():
         
         # Run inference
         result = _inference_service.infer(image)
-        
+        logger.info(f"Inference result: {result}")
         return jsonify({
             "human_count": result["human_count"],
             "hot_object_count": result["hot_object_count"],

@@ -3,6 +3,7 @@
 import base64
 import io
 import json
+import os
 import numpy as np
 import pytest
 
@@ -98,7 +99,7 @@ def test_inference_service_selects_cpu_on_x86(monkeypatch):
     monkeypatch.setattr(inf, "_machine_name", lambda: "x86_64")
     monkeypatch.setattr(inf, "_cpuinfo_text", lambda: "intel")
 
-    service = inf.InferenceService()
+    service = inf.InferenceService(os.getenv("RKNN_MODEL_PATH"), os.getenv("ONNX_MODEL_PATH"), 0.5, 0.4)
     assert service.backend == "cpu"
     assert isinstance(service.detector, DummyCPU)
 
@@ -110,7 +111,7 @@ def test_inference_service_selects_npu_on_rk3588(monkeypatch):
     monkeypatch.setattr(inf, "_machine_name", lambda: "aarch64")
     monkeypatch.setattr(inf, "_cpuinfo_text", lambda: "rockchip rk3588")
 
-    service = inf.InferenceService()
+    service = inf.InferenceService(os.getenv("RKNN_MODEL_PATH"), os.getenv("ONNX_MODEL_PATH"), 0.5, 0.4)
     assert service.backend == "npu"
     assert isinstance(service.detector, DummyNPU)
 
@@ -122,6 +123,6 @@ def test_inference_service_forwards_infer(monkeypatch):
     monkeypatch.setattr(inf, "_machine_name", lambda: "x86_64")
     monkeypatch.setattr(inf, "_cpuinfo_text", lambda: "intel")
 
-    service = inf.InferenceService()
+    service = inf.InferenceService(os.getenv("RKNN_MODEL_PATH"), os.getenv("ONNX_MODEL_PATH"), 0.5, 0.4)
     out = service.infer(np.zeros((24, 32), dtype=np.float32))
     assert out == {"human_count": 1, "hot_object_count": 2}

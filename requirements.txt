@@ -15,7 +15,7 @@ psycopg2-binary>=2.9
 
 # Image Processing
 opencv-python>=4.8.0
-numpy>=1.26.0
+numpy<=1.26.0
 
 # Model Inference - Core dependencies (minimal)
 onnxruntime>=1.24.0

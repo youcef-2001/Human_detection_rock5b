@@ -24,7 +24,7 @@ def config():
 def app():
     """Create Flask app with testing config."""
     config = TestingConfig()
-    app, inference_service, ws_service = create_app(config)
+    app, inference_service = create_app(config)
     
     with app.app_context():
         # Create all tables

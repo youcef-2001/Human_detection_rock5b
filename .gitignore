@@ -14,3 +14,4 @@ src/.env.*
 src/db/data/*
 .docker
 .venv
+dataset_npy/*.npy
