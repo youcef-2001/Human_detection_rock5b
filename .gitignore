@@ -1,17 +1,30 @@
-/dataset/images
-/dataset/labels
-results
+# Datasets
+/dataset/
+dataset_npy/
 
-.vscode
-check*
-yolo*
-tests.log
-src/tests.log
-# Keep real environment secrets out of git
+# Environment and IDE
+.vscode/
+.venv/
 src/.env
 src/.env.*
-!src/.env.example
-src/db/data/*
-.docker
-.venv
-dataset_npy/*.npy
+
+# Testing and logs
+.pytest_cache/
+*.log
+tests.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Project specific
+results/
+check*
+yolo*
+src/db/data/
+.docker/
+
+# Scripts
+scripts/benchmark_onnx_cpu_gpu_dataset.py
+scripts/check_onnxruntime_backend.py

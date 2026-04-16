@@ -125,9 +125,13 @@ def main():
     parser.add_argument("--model", type=str, default="onnx/mon_YOLOv86.onnx")
     parser.add_argument("--image", type=str, required=True)
     parser.add_argument("--imgsz", type=int, default=320)
-    parser.add_argument("--conf", type=float, default=0.90)
-    parser.add_argument("--iou", type=float, default=0.01)
-    parser.add_argument("--out", type=str, default="results/result_pc2.jpg")
+    parser.add_argument("--conf", type=float, default=0.50)
+    parser.add_argument("--iou", type=float, default=0.50)
+    parser.add_argument("--out", type=str, default="results/result_pc_inference.jpg")
+    parser.add_argument("--mean", type=float, nargs=3, default=[0.0, 0.0, 0.0],
+                        help="Mean RGB applique par RKNN config")
+    parser.add_argument("--std", type=float, nargs=3, default=[255.0, 255.0, 255.0],
+                        help="Std RGB applique par RKNN config")
     args = parser.parse_args()
 
     img0 = cv2.imread(args.image)
@@ -139,8 +143,12 @@ def main():
 
     rknn = RKNN(verbose=False)
 
-    # Configuration obligatoire avant load_onnx
-    rknn.config(target_platform="rk3588")
+    # Aligne la simulation PC avec la conversion RKNN: suppression des warnings mean/std.
+    rknn.config(
+        mean_values=[[args.mean[0], args.mean[1], args.mean[2]]],
+        std_values=[[args.std[0], args.std[1], args.std[2]]],
+        target_platform="rk3588"
+    )
 
     # Charger le modèle ONNX (pas .rknn) pour le simulateur PC
     ret = rknn.load_onnx(args.model)
@@ -152,7 +160,7 @@ def main():
     if ret != 0:
         raise RuntimeError("build a échoué")
 
-    # Simulateur PC (pas de target = simulation CPU)
+    # Simulateur PC RKNN (CPU): la cible NPU est seulement sur la carte RK3588.
     ret = rknn.init_runtime()
     if ret != 0:
         raise RuntimeError("init_runtime (simulateur) a échoué")
