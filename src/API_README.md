@@ -1,273 +1,539 @@
-# Human Detection API
+# Human Detection API (Reference Unique)
 
-Flask web application for human and hot object detection using RKNN (RK3588 NPU) or ONNX (CPU) inference backends.
+Ce document fusionne et remplace les anciennes documentations API.
+Il décrit les routes réellement implémentées dans le backend Flask actuel.
 
-## Features
+## Pré-requis d'exécution
 
-- **Dual Inference Backends**: Automatically selects NPU (RK3588) or CPU ONNX based on platform
-- **RESTful API**: Simple HTTP endpoints for detection
-- **WebSocket Monitoring**: Background listener for ESP32 thermal data streams
-- **Professional Logging**: Structured logging throughout application
-- **Type Hints**: Full type annotation for code clarity
-- **Test Coverage**: Comprehensive unit and integration tests (TDD approach)
-- **Security**: CSRF protection, input validation, secure defaults
+- Python 3.11.x (obligatoire, vérifié au démarrage par `src/run.py`).
+- Base PostgreSQL démarrée via `docker compose` dans `src/`.
+- Variables d'environnement définies via `src/.env`.
 
-## Project Structure
-
-```
-.
-├── app/
-│   ├── __init__.py              # Flask app factory
-│   ├── config.py                # Configuration management
-│   ├── main.py                  # Server entry point
-│   ├── controllers/             # API endpoint handlers
-│   │   ├── hello_controller.py  # /hello/ endpoint
-│   │   └── inference_controller.py  # /inference/detect endpoint
-│   ├── services/                # Business logic services
-│   │   ├── inference_service.py # Detector backends (NPU/ONNX)
-│   │   └── websocket_service.py # ESP32 WebSocket listener
-│   └── utils/                   # Utilities
-│       └── platform_detector.py # Hardware detection
-├── tests/                       # Test suite
-│   ├── conftest.py             # Pytest fixtures
-│   ├── test_inference_service.py   # Detector tests
-│   ├── test_controllers.py      # API endpoint tests
-│   ├── test_websocket_service.py   # WebSocket tests
-│   └── test_integration.py      # End-to-end workflow tests
-├── run.py                       # Application launcher
-├── requirements.txt             # Python dependencies
-└── pytest.ini                   # Test configuration
-```
-
-## Installation
-
-### Prerequisites
-
-- Python 3.11+
-- For RK3588: RKNN toolkit2 installed (separate)
-- For x86/x64: ONNX Runtime (included in requirements)
-
-### Setup
-
-1. Clone or navigate to project directory
-2. Create Python environment:
-   ```bash
-   # If using conda
-   conda create -n detection python=3.11
-   conda activate detection
-   
-   # Or with venv
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. For RK3588 NPU support, install RKNN toolkit2 separately following Radxa documentation
-
-## Usage
-
-### Start Server
+### Démarrage local recommandé
 
 ```bash
-# Development server with debug mode
-python run.py --debug
+cd src
+cp .env.example .env
 
-# Production server
-python run.py --host 0.0.0.0 --port 5000
+# Base principale (port hôte 5432)
+docker compose up -d postgres
 
-# Custom configuration via environment variables
-export FLASK_ENV=production
-export SECRET_KEY="your-secret-key-here"
-export ESP32_WS_URI="ws://192.168.1.100:81/"
-python run.py
+# Dépendances backend
+make install
+
+# API Flask (sur l'hôte)
+make run
 ```
 
-### API Endpoints
+### Exécution des tests
 
-#### Health Check
+Les tests utilisent la base de test (port hôte 5433):
+
 ```bash
+cd src
+docker compose up -d postgres_test
+make test
+```
+
+## URL de base
+
+- API: `http://localhost:5000`
+
+## Liste complète des routes
+
+### Système
+
+- GET /health
+- GET /hello/
+
+### Inference
+
+- POST /inference/detect
+
+### Auth et utilisateurs
+
+- POST /api/auth/signup
+- POST /api/auth/login
+- GET /api/users/{username}
+
+### ESP32 nodes
+
+- GET /api/esp-nodes
+- GET /api/esp-nodes/{node_id}
+- POST /api/esp-nodes
+- PUT /api/esp-nodes/{node_id}
+- DELETE /api/esp-nodes/{node_id}
+
+### Températures
+
+- GET /api/temperatures
+- GET /api/temperatures/{temp_id}
+- POST /api/temperatures
+- PUT /api/temperatures/{temp_id}
+- DELETE /api/temperatures/{temp_id}
+
+### Logs
+
+- GET /api/logging
+- GET /api/logging/{log_id}
+- POST /api/logging
+- PUT /api/logging/{log_id}
+- DELETE /api/logging/{log_id}
+- GET /api/logging/stats
+
+### Scénarios
+
+- GET /api/scenarios
+- GET /api/scenarios/{scenario_id}
+- POST /api/scenarios
+- PUT /api/scenarios/{scenario_id}
+- DELETE /api/scenarios/{scenario_id}
+- POST /api/scenarios/{scenario_id}/esp-nodes
+- DELETE /api/scenarios/{scenario_id}/esp-nodes/{esp_node_id}
+
+### Découverte réseau
+
+- POST /api/network/scan-esp32
+
+## Endpoints système
+
+### Health Check
+
+```http
 GET /health
-# Response: {"status": "healthy"}
 ```
 
-#### Hello World
-```bash
+Réponse 200:
+
+```json
+{
+    "status": "healthy"
+}
+```
+
+### Hello
+
+```http
 GET /hello/
-# Response: {"message": "Hello World"}
 ```
 
-#### Image Detection
-```bash
+Réponse 200:
+
+```json
+{
+    "message": "Hello World"
+}
+```
+
+## Inference
+
+### Détection
+
+```http
 POST /inference/detect
-Content-Type: multipart/form-data
+```
 
-# Upload image file (JPEG, PNG) or binary thermal data (24x32 float32)
-# Request:
-file: <image_file.jpg or thermal.bin>
+Formats supportés:
 
-# Response (200 OK):
+- `multipart/form-data` avec champ fichier `image`.
+- `application/json` (payload thermique 24x32 décodable en 768 float32).
+
+Réponse 200:
+
+```json
 {
     "human_count": 2,
     "hot_object_count": 1,
     "success": true
 }
+```
 
-# Error Response (400/500):
+Erreurs usuelles:
+
+- `400` payload invalide.
+- `503` backend d'inférence indisponible.
+- `500` erreur interne.
+
+## Authentification et utilisateurs
+
+### Inscription
+
+```http
+POST /api/auth/signup
+Content-Type: application/json
+```
+
+Corps minimal:
+
+```json
 {
-    "error": "description of error",
-    "success": false
+    "username": "alice",
+    "email": "alice@example.com",
+    "password": "secret",
+    "first_name": "Alice",
+    "last_name": "Doe"
 }
 ```
 
-### Example: Python Client
+Erreurs:
 
-```python
-import requests
-import numpy as np
+- `400` champ obligatoire absent.
+- `409` username ou email déjà existant.
 
-# Detect in image
-with open('image.jpg', 'rb') as f:
-    response = requests.post(
-        'http://localhost:5000/inference/detect',
-        files={'image': f}
-    )
-    print(response.json())
+### Login
 
-# Detect in thermal frame (24x32 float32)
-thermal_frame = np.random.uniform(5, 55, (24, 32)).astype(np.float32)
-response = requests.post(
-    'http://localhost:5000/inference/detect',
-    files={'image': ('thermal.bin', thermal_frame.tobytes())}
-)
-print(response.json())
+```http
+POST /api/auth/login
+Content-Type: application/json
 ```
 
-## Testing
+Corps:
 
-### Run All Tests
-```bash
-pytest
+```json
+{
+    "username": "alice",
+    "password": "secret"
+}
 ```
 
-### Run Specific Test File
-```bash
-pytest tests/test_controllers.py -v
+Erreurs:
+
+- `400` payload incomplet.
+- `401` identifiants invalides.
+- `403` compte non validé.
+
+### Profil utilisateur
+
+```http
+GET /api/users/{username}
 ```
 
-### With Coverage Report
-```bash
-pytest --cov=app tests/
+Erreurs:
+
+- `404` utilisateur introuvable.
+
+## ESP32 Nodes
+
+### Lister les noeuds
+
+```http
+GET /api/esp-nodes?username=alice
 ```
 
-### Run Only Unit Tests
-```bash
-pytest tests/test_inference_service.py tests/test_controllers.py -v
+Paramètres:
+
+- `username` (optionnel): filtre par propriétaire.
+
+### Obtenir un noeud
+
+```http
+GET /api/esp-nodes/{node_id}
 ```
 
-### Integration Tests
-```bash
-pytest tests/test_integration.py -v
+### Créer un noeud
+
+```http
+POST /api/esp-nodes
+Content-Type: application/json
 ```
 
-## Configuration
+Corps minimal:
 
-Configuration is managed through `app/config.py`:
-
-- **DevelopmentConfig**: Debug mode, verbose logging
-- **ProductionConfig**: Secure defaults, requires SECRET_KEY env var
-- **TestingConfig**: Test-specific settings
-
-Environment Variables:
-- `FLASK_ENV`: `development`, `production`, or `testing`
-- `SECRET_KEY`: Session secret (required for production)
-- `ESP32_WS_URI`: WebSocket address of ESP32 (default: ws://10.28.26.7:81/)
-- `FLASK_HOST`: Server host (default: 0.0.0.0)
-- `FLASK_PORT`: Server port (default: 5000)
-- `FLASK_DEBUG`: Enable debug mode (default: false)
-
-## Architecture
-
-### Inference Service (Factory Pattern)
-
-Automatically selects appropriate detector:
-
-```python
-service = InferenceService(
-    rknn_model_path="path/to/model.rknn",
-    onnx_model_path="path/to/model.onnx"
-)
-
-# Returns HumanDetectorNPU on RK3588
-# Returns HumanDetectorCPU on x86/x64
-result = service.infer(image)
+```json
+{
+    "ip_address": "192.168.1.100"
+}
 ```
 
-### WebSocket Service (Background Thread)
+Corps complet possible:
 
-Continuously monitors ESP32 thermal stream:
-
-```python
-service = WebSocketService(uri="ws://esp32:81/")
-service.start()  # Runs in background thread
-
-service.set_frame_callback(lambda frame: process(frame))
+```json
+{
+    "username": "alice",
+    "ip_address": "192.168.1.100",
+    "room_name": "Salon",
+    "camera_url": "http://192.168.1.100",
+    "color_hex": "#FF5500",
+    "pos_x": 50,
+    "pos_y": 40,
+    "has_camera": true,
+    "show_temperature": true,
+    "show_presence": true
+}
 ```
 
-### Code Style
+Erreurs:
 
-- Type hints on all functions
-- Docstrings following Google style
-- Singleton pattern for expensive resources
-- Factory pattern for polymorphic creation
-- Separated concerns (services, controllers, utils)
+- `400` `ip_address` manquant.
+- `404` username inconnu.
+- `409` IP déjà existante.
 
-## Performance
+### Mettre à jour un noeud
 
-- NPU inference (RK3588): ~10-20ms per frame
-- CPU inference (ONNX): ~50-100ms per frame (depends on system)
-- Memory: ~200MB per detector instance
-- WebSocket: Continuous monitoring with <2ms latency
-
-## Security Considerations
-
-- CSRF tokens enabled
-- Input validation on all endpoints
-- Max file size: 16MB
-- Secure headers configured
-- No default credentials
-- Production requires explicit SECRET_KEY
-
-## Troubleshooting
-
-### Import Errors
-If `rknnlite` import fails on x86:
-- Normal on non-RK3588 systems
-- ONNX backend will be used automatically
-- Install onnxruntime: `pip install onnxruntime`
-
-### Model Not Found
-```python
-FileNotFoundError: [Errno 2] No such file or directory: 'path/to/model.rknn'
+```http
+PUT /api/esp-nodes/{node_id}
+Content-Type: application/json
 ```
-- Check model paths in config
-- Ensure models exist in `rknn/` and `onnx/` directories
 
-### WebSocket Connection Failed
+Champs modifiables: `room_name`, `camera_url`, `color_hex`, `pos_x`, `pos_y`, `has_camera`, `show_temperature`, `show_presence`.
+
+### Supprimer un noeud
+
+```http
+DELETE /api/esp-nodes/{node_id}
 ```
-WARNING: WebSocket error: [Errno 111] Connection refused
+
+## Températures
+
+### Lister
+
+```http
+GET /api/temperatures?esp_node_id=1&limit=100&offset=0
 ```
-- Verify ESP32 IP address and port
-- Check ESP32 is running and reachable
-- Service will auto-reconnect with backoff
 
-## License
+### Obtenir
 
-[Specify your license here]
+```http
+GET /api/temperatures/{temp_id}
+```
 
-## Contributing
+### Créer
 
-Follow PEP 8 style guide, write tests for new features, and update documentation.
+```http
+POST /api/temperatures
+Content-Type: application/json
+```
+
+Corps requis:
+
+```json
+{
+    "esp_node_id": 1,
+    "event_key": "sensor_001_1713176400",
+    "temperature": 25.5,
+    "measured_at": "2024-04-15T10:30:00"
+}
+```
+
+Erreurs:
+
+- `400` champ manquant ou date invalide (ISO 8601 attendu).
+- `404` noeud ESP introuvable.
+- `409` `event_key` déjà existant.
+
+### Mettre à jour
+
+```http
+PUT /api/temperatures/{temp_id}
+Content-Type: application/json
+```
+
+Champs modifiables: `temperature`, `measured_at`.
+
+### Supprimer
+
+```http
+DELETE /api/temperatures/{temp_id}
+```
+
+## Logs
+
+### Lister
+
+```http
+GET /api/logging?username=alice&log_type=user&limit=100&offset=0
+```
+
+Paramètres:
+
+- `username` (optionnel)
+- `log_type` (optionnel: `user` ou `system`)
+- `limit`, `offset`
+
+### Obtenir
+
+```http
+GET /api/logging/{log_id}
+```
+
+### Créer
+
+```http
+POST /api/logging
+Content-Type: application/json
+```
+
+Exemple:
+
+```json
+{
+    "username": "alice",
+    "log_type": "user",
+    "action_log": "Scenario created",
+    "concerned_column": "scenarios"
+}
+```
+
+Erreurs:
+
+- `400` `log_type`/`action_log` manquants ou type invalide.
+- `404` username inconnu.
+
+### Mettre à jour
+
+```http
+PUT /api/logging/{log_id}
+Content-Type: application/json
+```
+
+Champs modifiables: `action_log`, `log_type`, `concerned_column`.
+
+### Supprimer
+
+```http
+DELETE /api/logging/{log_id}
+```
+
+### Statistiques
+
+```http
+GET /api/logging/stats
+```
+
+Réponse 200:
+
+```json
+{
+    "total": 150,
+    "user_logs": 100,
+    "system_logs": 50
+}
+```
+
+## Scénarios
+
+### Lister
+
+```http
+GET /api/scenarios?username=alice&is_active=true&limit=100&offset=0
+```
+
+### Obtenir
+
+```http
+GET /api/scenarios/{scenario_id}
+```
+
+### Créer
+
+```http
+POST /api/scenarios
+Content-Type: application/json
+```
+
+Exemple:
+
+```json
+{
+    "username": "alice",
+    "name": "Living Room Detection",
+    "description": "Detect humans in living room",
+    "is_active": true,
+    "icon_code": 58826,
+    "color_value": 4283215696,
+    "start_hour": 8,
+    "start_minute": 0,
+    "end_hour": 20,
+    "end_minute": 0,
+    "target_temp": 35.5,
+    "use_time_limit": true,
+    "esp_node_ids": [1, 2]
+}
+```
+
+Erreurs:
+
+- `400` `name` manquant.
+- `404` username inconnu.
+- `409` nom déjà existant (scope utilisateur).
+
+### Mettre à jour
+
+```http
+PUT /api/scenarios/{scenario_id}
+Content-Type: application/json
+```
+
+Champs modifiables: `description`, `is_active`, `icon_code`, `color_value`, `start_hour`, `start_minute`, `end_hour`, `end_minute`, `target_temp`, `use_time_limit`, `esp_node_ids`.
+
+### Supprimer
+
+```http
+DELETE /api/scenarios/{scenario_id}
+```
+
+### Ajouter un noeud ESP à un scénario
+
+```http
+POST /api/scenarios/{scenario_id}/esp-nodes
+Content-Type: application/json
+```
+
+Corps:
+
+```json
+{
+    "esp_node_id": 3
+}
+```
+
+### Retirer un noeud ESP d'un scénario
+
+```http
+DELETE /api/scenarios/{scenario_id}/esp-nodes/{esp_node_id}
+```
+
+## Découverte réseau ESP32
+
+### Scanner le réseau
+
+```http
+POST /api/network/scan-esp32
+Content-Type: application/json
+```
+
+Corps optionnel:
+
+```json
+{
+    "preferred_hosts": ["192.168.1.10", "192.168.1.11"],
+    "extra_candidates": ["192.168.1.20"],
+    "timeout_ms": 700,
+    "max_results": 5,
+    "workers": 48,
+    "scan_full_subnet": true
+}
+```
+
+Réponse 200:
+
+```json
+{
+    "discovered_hosts": ["192.168.1.100"],
+    "first_host": "192.168.1.100",
+    "scanned_candidate_count": 3,
+    "timeout_ms": 700
+}
+```
+
+## Codes d'erreur HTTP
+
+- `200` succès.
+- `201` ressource créée.
+- `400` payload invalide.
+- `401` non authentifié.
+- `403` accès refusé.
+- `404` ressource introuvable.
+- `409` conflit d'unicité.
+- `500` erreur interne.
+- `503` service d'inférence indisponible.

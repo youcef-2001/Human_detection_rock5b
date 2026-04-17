@@ -22,7 +22,9 @@ _ensure_python_311()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+    # Keep site-packages precedence to avoid shadowing third-party modules
+    # by similarly named top-level project directories (e.g. onnx/).
+    sys.path.append(str(PROJECT_ROOT))
 
 from src.app.main import run
 

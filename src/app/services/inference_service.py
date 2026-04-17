@@ -281,31 +281,17 @@ class HumanDetectorCPU:
             return
 
         try:
-            from rknn.api import RKNN
+            import onnxruntime as ort
         except Exception as exc:
-            raise RuntimeError("rknn toolkit is not available in this environment") from exc
+            raise RuntimeError("onnxruntime is not available in this environment") from exc
 
         self.conf = conf
         self.iou = iou
-        self.rknn = RKNN(verbose=False)
-
-        # Required configuration before loading ONNX in simulator mode.
-        self.rknn.config(target_platform="rk3588")
-
-        # Load ONNX model for PC simulator path.
-        ret = self.rknn.load_onnx(model_path)
-        if ret != 0:
-            raise RuntimeError("load_onnx a échoué")
-
-        # Build model for simulator.
-        ret = self.rknn.build(do_quantization=False)
-        if ret != 0:
-            raise RuntimeError("build a échoué")
-
-        # Init simulator runtime (CPU).
-        ret = self.rknn.init_runtime()
-        if ret != 0:
-            raise RuntimeError("init_runtime (simulateur) a échoué")
+        self.session = ort.InferenceSession(
+            model_path,
+            providers=["CPUExecutionProvider"],
+        )
+        self.input_name = self.session.get_inputs()[0].name
         self._initialized = True
 
     def infer_detections(self, image: np.ndarray) -> dict:
@@ -322,7 +308,7 @@ class HumanDetectorCPU:
         inp = cv2.cvtColor(img320, cv2.COLOR_BGR2RGB)
         inp = np.expand_dims(inp, axis=0)
 
-        outputs = self.rknn.inference(inputs=[inp])
+        outputs = self.session.run(None, {self.input_name: inp})
         _, _, cls_ids = postprocess(
             outputs,
             orig_hw=bgr.shape[:2],
@@ -337,8 +323,7 @@ class HumanDetectorCPU:
 
     def release(self):
         """Release RKNN runtime resources."""
-        if getattr(self, "rknn", None) is not None:
-            self.rknn.release()
+        self.session = None
 
 
 

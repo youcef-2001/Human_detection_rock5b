@@ -27,7 +27,8 @@ def run(host: str = "0.0.0.0", port: int = 5000, debug: bool = False) -> None:
     def shutdown_handler(signum, frame):
         """Handle shutdown signals gracefully."""
         logger.info("Shutdown signal received")
-        inference_service.release()
+        if inference_service is not None:
+            inference_service.release()
         sys.exit(0)
     
     # Register signal handlers
@@ -42,7 +43,8 @@ def run(host: str = "0.0.0.0", port: int = 5000, debug: bool = False) -> None:
         logger.error(f"Server error: {e}")
         raise
     finally:
-        inference_service.release()
+        if inference_service is not None:
+            inference_service.release()
 
 
 if __name__ == "__main__":

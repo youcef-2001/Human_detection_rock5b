@@ -1,7 +1,7 @@
 """Flask application factory."""
 
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 from flask import Flask
 from flask_cors import CORS
@@ -27,7 +27,7 @@ from .services import InferenceService
 logger = logging.getLogger(__name__)
 
 
-def create_app(config: Optional[Config] = None) -> Flask:
+def create_app(config: Optional[Config] = None) -> Tuple[Flask, Optional[InferenceService]]:
     """
     Create and configure Flask application.
     
@@ -35,7 +35,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
         config: Optional Config object. If None, uses environment-based config.
     
     Returns:
-        Configured Flask application instance.
+        Tuple of configured Flask application and optional inference service.
     """
     if config is None:
         config = get_config()
@@ -63,6 +63,7 @@ def create_app(config: Optional[Config] = None) -> Flask:
         logger.info("Database initialized and tables created")
     
     # Initialize inference service
+    inference_service = None
     try:
         inference_service = InferenceService(config.RKNN_MODEL_PATH, config.ONNX_MODEL_PATH, config.CONFIDENCE_THRESHOLD, config.IOU_THRESHOLD)
         init_inference_service(inference_service)

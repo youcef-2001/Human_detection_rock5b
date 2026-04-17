@@ -1,228 +1,191 @@
-# Human_detection_rock5b
+# Human Detection - ROCK 5B (RK3588)
 
-Ce dépôt contient 2 projets complémentaires :
+Documentation technique du projet de détection humaine thermique, structuré autour de deux volets complémentaires :
 
-1. Projet IA RK SDK (entraînement, conversion, optimisation NPU RKNN)
-2. Projet serveur web Human Detector (API Flask + PostgreSQL )
+1. Pipeline IA (préparation des données, entraînement, conversion ONNX/RKNN)
+2. Backend Flask (API métier, persistance PostgreSQL, découverte réseau des noeuds ESP32)
 
-Le but est simple :
-- préparer un modèle de détection de personnes à partir de données thermiques ;
-- l’exécuter et l’exposer via une API utilisable facilement.
+Ce projet est réalisé dans le cadre du projet de fin d'année (Master 2 IoT et Architecture Logicielle).
 
----
+## Objectifs
 
-## Vue rapide
+- Construire des modèles de détection à partir de données thermiques.
+- Déployer les modèles sur plateforme RK3588 via RKNN (NPU).
+- Exposer les fonctions métier et de supervision via une API Flask.
+- Persister les données applicatives (noeuds ESP32, scénarios, températures, logs) dans PostgreSQL.
 
-### Projet 1 : IA / RK SDK
+## Vue d'ensemble de l'architecture
 
-À quoi ça sert :
-- créer et améliorer les modèles IA ;
-- convertir les données thermiques ;
-- entraîner YOLO ;
-- exporter vers ONNX puis RKNN pour ROCK 5B.
+Le dépôt combine :
 
-Dossiers clés :
-- scripts : scripts de conversion/entraînement
-- dataset et dataset_npy : données d’entrée
-- onnx : modèles ONNX
-- rknn : modèles pour NPU
-- runs : résultats d’entraînement
+- Une chaîne IA orientée entraînement et conversion de modèles.
+- Un backend Python/Flask exécuté sur l'hôte.
+- Une base PostgreSQL exécutée en conteneur Docker.
 
-### Projet 2 : Serveur web Human Detector
+Choix d'architecture recommandé dans ce projet :
 
-À quoi ça sert :
-- exposer une API HTTP ;
-- stocker les ESP nodes, les scenarios, les logs de température pour l'application Front;
-- conserver les données en base PostgreSQL même après redémarrage Docker.
+- API Flask lancée sur l'hôte pour faciliter l'accès au NPU et aux ressources matérielles.
+- PostgreSQL en conteneur pour une installation reproductible, simple à démarrer et isolée.
 
-Dossiers clés :
-- src/app : code de l’API
-- src/docker-compose.yml : service PostgreSQL
-- src/db/init : scripts SQL d’initialisation
-- src/tests : tests API
+## Structure du dépôt
 
-Persistance DB :
-- PostgreSQL écrit ses données sur un volume bindé : /volumes/data/postgresql
+### Pipeline IA
 
----
+- dataset/ : datasets images et labels pour l'entraînement des modèles.
+- dataset_npy/ : captures thermiques brutes (format .npy) issues de la caméra MLX.
+- scripts/ : scripts de préparation de données, entraînement, conversion et tests d'inférence.
+- runs/ : sorties d'entraînement et de fine-tuning.
+- onnx/ : modèles convertis vers ONNX (depuis PyTorch).
+- rknn/ : modèles convertis vers RKNN (depuis ONNX), prêts pour RK3588.
 
-## Prérequis minimum
+### Backend API
 
-- Linux recommandé
-- Python 3.11
-- pip
-- Docker + Docker Compose
-- RKNN SDK 
+- src/app/ : coeur de l'application Flask (controllers, services, modèles ORM, configuration).
+- src/tests/ : tests unitaires et d'intégration.
+- src/db/ : scripts d'initialisation SQL et répertoires de données PostgreSQL.
+- src/docker-compose.yml : services PostgreSQL (dev et test).
+- src/Makefile : commandes de développement (install, run, test, lint, format).
 
----
+## Chaîne de traitement IA
 
-## Démarrage rapide (Application superviseur_app)
+Principe de bout en bout :
 
-Pour lancer l'application complète avec le backend Flask et PostgreSQL :
+1. Les données thermiques .npy sont converties en images exploitables pour l'entraînement.
+2. Un entraînement produit un checkpoint best.pt dans un dossier runs/.../weights/.
+3. Chaque best.pt est converti en ONNX.
+4. Le modèle ONNX est converti en RKNN pour exécution sur RK3588.
 
-### Terminal 1 - Démarrer PostgreSQL (Docker)
+Références utiles :
+
+- Projet caméra thermique MLX (génération/stream des données) : https://github.com/gaesty/MLX90640BAA
+- Installation de l'environnement RKNN (Radxa) : https://docs.radxa.com/en/rock5/rock5c/app-development/ai/rknn-install
+
+## Prérequis
+
+- Linux recommandé pour l'environnement RKNN.
+- Python 3.11.x.
+- Docker + Docker Compose.
+- Environnement RKNN correctement installé (toolkit, runtime, dépendances Radxa).
+
+## Démarrage rapide - Partie IA
+
+Depuis la racine du projet :
+
+```bash
+conda activate rknn
+pip install -r requirements.txt
+
+# Conversion des frames thermiques en images d'entraînement
+python scripts/convert_npy_to_png.py --input dataset_npy --output dataset/images
+
+# Entraînement
+python scripts/train.py 
+
+# Conversion PyTorch -> ONNX
+python scripts/convert_to_onnx.py 
+
+# Conversion ONNX -> RKNN
+python scripts/convert_to_rknn.py \
+  --onnx onnx/mon_YOLOv84.onnx \
+  --output rknn/mon_YOLOv84.rknn
+```
+
+Validation finale possible via les scripts de test d'inférence :
+
+- scripts/test_inference_PC.py (environnement PC)
+- scripts/test_inference_rock5b.py (plateforme RK3588)
+
+## Démarrage rapide - Backend Flask + PostgreSQL
+
+### 1) Préparer l'environnement backend
 
 ```bash
 cd src
-docker-compose up -d
+cp .env.example .env
 ```
 
-### Terminal 2 - Démarrer l'API Flask
+Vérifier que DATABASE_URL pointe vers PostgreSQL local (conteneur mappé sur 5432), par exemple :
+
+```dotenv
+DATABASE_URL=postgresql://human_user:human_pass@localhost:5432/human_detection
+```
+
+### 2) Démarrer PostgreSQL via Docker
 
 ```bash
-cd .
-(& ".\.venv\Scripts\Activate.ps1")  # Activation virtualenv Windows
-python "src\run.py" --host 0.0.0.0 --port 5000
+docker compose up -d postgres
 ```
 
-**Ou avec PowerShell complet :**
-```powershell
-(& "c:\Users\boula\Desktop\Human_detection_rock5b\.venv\Scripts\Activate.ps1") ; python "src\run.py" --host 0.0.0.0 --port 5000
+### 3) Installer les dépendances backend
+
+```bash
+make install
 ```
 
-### Terminal 3 - Lancer l'application Flutter
+### 4) Lancer l'API Flask sur l'hôte
+
+```bash
+make run
+```
+
+Important : l'exécution de l'API sur l'hôte est préférée pour l'accès NPU/hardware. Le mode API en conteneur n'est pas le mode de référence du projet.
+
+### 5) Lancer les tests
+
+```bash
+docker compose up -d postgres_test
+make test
+```
+
+## Lancement complet avec l'application superviseur_app
+
+Une fois PostgreSQL et l'API démarrés, lancer l'interface Flutter:
 
 ```bash
 cd ../superviseur_app
 flutter run
 ```
 
-**Résumé des ports :**
-- API Flask : `http://localhost:5000`
-- PostgreSQL : `localhost:5432`
-- Application Flutter : `http://localhost:54107` (ou autre)
+Ports usuels :
 
-**L'API sera accessible à `http://localhost:5000`** et l'application Flutter s'y connectera automatiquement.
+- API Flask : http://localhost:5000
+- PostgreSQL : localhost:5432
+- Flutter Web/Desktop : port attribué par Flutter (variable selon la cible)
 
----
+## Réseau et découverte ESP32
 
-## Get Started 1 - IA RK SDK (démarrage rapide)
+Pour l'appairage automatique avec les noeuds ESP32 compatibles :
 
-Objectif : entraîner/convertir un modèle.
+- La machine hôte (ROCK 5B ou machine d'exécution) doit être sur le même réseau local que les ESP32.
+- Le backend effectue une détection des noeuds en scannant notamment le port 81 (signature ESP32 thermique/websocket).
+- Les noeuds ESP32 doivent être flashés/configurés avec le projet MLX90640BAA puis connectés au Wi-Fi cible.
 
-1. Aller à la racine du projet
+## Commandes utiles (backend)
 
-```bash
-cd Human_detection_rock5b
-```
+Depuis src/ :
 
-2. Activer l’environnement Python
+- make install : installer les dépendances Python.
+- make run : démarrer l'API en mode debug.
+- make run-prod : démarrer l'API en mode production.
+- make test : exécuter la suite de tests.
+- make test-cov : exécuter les tests avec couverture.
+- make lint : vérifier le style.
+- make format : formater le code.
 
-```bash
-conda activate rknn
-```
+## Documentation complémentaire
 
-3. Installer les dépendances
+- Documentation API générale : src/API_README.md
 
-```bash
-pip install -r requirements.txt
-```
+## Notes d'exploitation
 
-4. Convertir les frames .npy en images
-
-```bash
-python scripts/convert_npy_to_png.py --input dataset_npy --output dataset/images
-```
-
-5. Entraîner YOLO
-
-```bash
-python scripts/train.py --data dataset/data.yaml --name mon_YOLOv8 --epochs 100
-```
-
-6. Exporter en ONNX
-
-```bash
-python scripts/convert_to_onnx.py \
-  --weights runs/detect/models/mon_YOLOv84/weights/best.pt \
-  --output onnx/mon_YOLOv84.onnx
-```
-
-7. Convertir ONNX vers RKNN
-
-```bash
-python scripts/convert_to_rknn.py \
-  --onnx onnx/mon_YOLOv84.onnx \
-  --output rknn/mon_YOLOv84.rknn
-```
-
-Résultat attendu :
-- un modèle ONNX dans onnx/
-- un modèle RKNN dans rknn/
-
----
-
-## Get Started 2 - Serveur web (démarrage rapide)
-
-Objectif : lancer l’API en local avec PostgreSQL dans Docker.
-
-1. Aller dans le projet serveur
-
-```bash
-cd src
-```
-
-2. Créer le fichier d’environnement local (si absent)
-
-```bash
-cp .env.example .env
-```
-
-3. Vérifier la base (mode API en local + DB Docker)
-
-- DATABASE_URL doit pointer sur localhost:5432
-
-Exemple :
-
-```dotenv
-DATABASE_URL=postgresql://human_user:human_pass@localhost:5432/human_detection
-```
-
-4. Démarrer PostgreSQL uniquement
-
-```bash
-docker compose up -d postgres
-```
-
-5. Installer les dépendances serveur
-
-```bash
-make install
-```
-
-6. Lancer l’API sur la machine hôte
-
-```bash
-make run
-```
-
-7. Tester rapidement
-
-```bash
-curl http://localhost:5000/health
-```
-
----
-
-## Variables et sécurité
-
-- src/.env : valeurs réelles locales (secrets, URLs, mots de passe)
-- src/.env.example : modèle partageable sur GitHub
-
-
----
+- La persistance PostgreSQL est gérée via les volumes Docker déclarés dans src/docker-compose.yml et les répertoires sous src/db/data/.
+- Les variables sensibles doivent rester dans src/.env (non versionné).
+- Le fichier src/.env.example sert de modèle de configuration.
 
 ## Dépannage rapide
 
-- Port 5432 occupé : changer le mapping dans src/docker-compose.yml
-- Erreur DB refused : vérifier que postgres est bien up (docker ps)
-- API ne démarre pas : vérifier que src/.env existe et est rempli
-- Données perdues : vérifier que /volumes/data/postgresql est accessible
-
----
-
-## En résumé
-
-- Projet IA RK SDK = fabriquer et optimiser les modèles.
-- Projet serveur web = exposer les services métiers + stocker les données.
-- Pour un usage simple : lancer postgres via Docker, lancer API en local, puis appeler les routes HTTP.
+- Port 5432 occupé : modifier le mapping de ports dans src/docker-compose.yml.
+- PostgreSQL indisponible : vérifier l'état du conteneur (docker ps, docker logs).
+- API non démarrée : vérifier que l'environnement Python actif est bien en 3.11.x, puis contrôler src/.env et les dépendances.
+- Tests en échec avec `Connection refused` sur `localhost:5433` : démarrer `postgres_test` puis relancer `make test`.
+- Découverte ESP32 vide : vérifier le même sous-réseau, la connectivité Wi-Fi et la disponibilité du port 81 sur les noeuds.
