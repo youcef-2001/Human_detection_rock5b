@@ -2,7 +2,12 @@ import argparse
 from pathlib import Path
 import cv2
 import numpy as np
-from rknn.api import RKNN
+import os
+if os.environ.get("CPU_INFERENCE_MODE", "RKNN").upper() == "RKNN":
+    from rknn.api import RKNN
+
+
+
 
 
 CLASS_NAMES = ["Humain", "Objet_Chaud"]

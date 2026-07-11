@@ -301,6 +301,7 @@ class HumanDetectorCPU:
         )
         self.input_name = self.session.get_inputs()[0].name
         self._initialized = True
+        self.number = 0  # Initialize the counter for unique filenames
 
     def infer_detections(self, image: np.ndarray) -> dict:
         """Run inference and return human and hot-object counts."""
@@ -312,6 +313,7 @@ class HumanDetectorCPU:
             bgr = thermal_to_bgr(image)
         else:
             bgr = ensure_bgr(image)
+        # Image bgr grise et normalisé pour le modèle
         img320, ratio, pad = letterbox(bgr, IMG_SIZE)
         inp = cv2.cvtColor(img320, cv2.COLOR_BGR2RGB)
         inp = (inp.astype(np.float32))      # Convert to float32 for ONNX runtime only
@@ -323,9 +325,12 @@ class HumanDetectorCPU:
             f"Image transformer INP - dtype={inp.dtype}, shape={inp.shape}, "
             f"ndim={inp.ndim}, min={float(inp.min()):.3f}, max={float(inp.max()):.3f}"
         )
+        
+        
+        
 
         outputs = self.session.run(None, {self.input_name: inp})
-        _, _, cls_ids = postprocess(
+        boxes, scores, cls_ids = postprocess(
             outputs,
             orig_hw=bgr.shape[:2],
             ratio=ratio,
@@ -333,6 +338,18 @@ class HumanDetectorCPU:
             conf_thr=self.conf,
             iou_thr=self.iou,
         )
+
+
+        # Dessin + sauvegarde pour monitoring (même logique que le chemin RKNN)
+        from scripts.test_inference_PC import draw_and_count
+        result_img, _ = draw_and_count(bgr, boxes, scores, cls_ids)
+        os.makedirs("./results/backend/", exist_ok=True)
+        self.number += 1
+        pathsave = cv2.imwrite(f"./results/backend/result_{self.number}_onnx.jpg", result_img)
+        logger.info(f"Image ONNX enregistrée: result_{self.number}_onnx.jpg (ok={pathsave})")
+
+
+
         human_count = int(np.sum(cls_ids == HUMAN_CLASS_INDEX)) if len(cls_ids) else 0
         hot_object_count = int(np.sum(cls_ids == HOT_OBJECT_CLASS_INDEX)) if len(cls_ids) else 0
         return {"human_count": human_count, "hot_object_count": hot_object_count}
@@ -442,7 +459,8 @@ class InferenceService:
         try:
             if m in ("x86_64", "amd64", "i386", "i686") or "intel" in c or "amd" in c:
                 self.backend = "cpu"
-                self.detector = HumanDetectorCPU(str(onnx_model), conf, iou) if self.cpu_inference_mode.upper() == "ONNX" else HumanDetectorCPU_RKNN(str(onnx_model), conf, iou)
+                print (f"CPU inference mode: {self.cpu_inference_mode}")
+                self.detector = HumanDetectorCPU(str(onnx_model), conf, iou) if self.cpu_inference_mode == "ONNX" else HumanDetectorCPU_RKNN(str(onnx_model), conf, iou)
             elif "rk3588" in c or "rockchip" in c:
                 self.backend = "npu"
                 self.detector = HumanDetectorNPU(str(rknn_model), conf, iou)
