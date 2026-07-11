@@ -122,11 +122,12 @@ def draw_and_count(image, boxes, scores, cls_ids):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="onnx/mon_YOLOv86.onnx")
+    parser.add_argument("--model", type=str, default="onnx/modele_v8l_9mb_3.onnx")
     parser.add_argument("--image", type=str, required=True)
     parser.add_argument("--imgsz", type=int, default=320)
-    parser.add_argument("--conf", type=float, default=0.50)
-    parser.add_argument("--iou", type=float, default=0.50)
+
+    parser.add_argument("--conf", type=float, default=0.01)
+    parser.add_argument("--iou", type=float, default=0.8)
     parser.add_argument("--out", type=str, default="results/result_pc_inference.jpg")
     parser.add_argument("--mean", type=float, nargs=3, default=[0.0, 0.0, 0.0],
                         help="Mean RGB applique par RKNN config")
@@ -146,7 +147,7 @@ def main():
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     print(
             f"Image reçue - dtype={img.dtype}, shape={img.shape}, "
-            f"ndim={img.ndim}, min={float(img.min()):.3f}, max={float(img.max()):.3f}"
+            f"ndim={img.ndim}, min={float(img.min()):.3f}, max={float(img.max()):.3f} "
         )
     rknn = RKNN(verbose=False)
 

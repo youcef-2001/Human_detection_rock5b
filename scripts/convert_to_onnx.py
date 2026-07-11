@@ -9,7 +9,7 @@ def convert_to_onnx(   name='mon_YOLOv86',):
     ONNX_DIR = ROOT / "onnx"
     ONNX_DIR.mkdir(parents=True, exist_ok=True)
 
-    model = YOLO(str(ROOT / f"runs/detect/models/{name}/weights/best.pt"))
+    model = YOLO(str(ROOT / f"scripts/runs/detect/models/{name}/weights/best.pt"))
 
     # Export ONNX (opset 12 recommandé pour RKNN)
     exported_path = model.export(format="onnx", imgsz=320, opset=12)
@@ -23,4 +23,4 @@ def convert_to_onnx(   name='mon_YOLOv86',):
     print(f"ONNX sauvegardé ici: {target_path}")
 
 if __name__ == "__main__":
-    convert_to_onnx("modeleCPU5")
+    convert_to_onnx("modele_v8l_9mb_3")

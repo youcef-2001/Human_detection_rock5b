@@ -20,12 +20,12 @@ def train(   _name='mon_YOLOv8'):
     print("=== Démarrage de l'entraînement YOLOv8 Thermique ===")
     
     # 1. Charger le modèle YOLOv8 nano (le plus léger et rapide, parfait pour le NPU du RK3588)
-    model = YOLO('yolov8n.pt')
+    model = YOLO('yolov8l.pt')
 
     # 2. Lancer l'entraînement
     results = model.train(
-        data='./dataset/data.yaml', # <-- Vérifiez que ce chemin correspond à votre fichier yaml
-        epochs=100,                 # 100 passages sur vos 2000 images est un excellent point de départ
+        data='./../dataset/data.yaml', # <-- Vérifiez que ce chemin correspond à votre fichier yaml
+        epochs=30,                 # 100 passages sur vos 2000 images est un excellent point de départ
         imgsz=320,                  # La résolution à laquelle nous avons agrandi les images
         batch=32,                   # Mettez 32 si votre PC a beaucoup de RAM, sinon gardez 16
         device='0',               # Mettez '0' si vous avez une carte graphique Nvidia sur votre PC
@@ -45,15 +45,15 @@ def train(   _name='mon_YOLOv8'):
         translate=0.1,         # Décalage de l'image de 10%
         scale=0.1,             # Zoom léger (10%)
         fliplr=0.5,            # Effet miroir gauche/droite à 50% de chance
-        flipud=0.0,            # Pas de miroir vertical (les humains ne sont pas à l'envers)
+        flipud=0.2,            # miroir vertical à 20% de chance
         mosaic=1.0             # Mélange 4 images en 1 (excellent pour les petits objets)
     )
 
     print("\n=== Entraînement terminé avec succès ! ===")
     print("Votre modèle final est sauvegardé ici :")
-    print("modeles_thermiques/v_finale_2classes/weights/best.pt")
+    print("./runs/detect/models/" + _name)
 
 if __name__ == '__main__':
     # Ce bloc if __name__ == '__main__' est parfois requis par Windows/PyTorch 
     # pour bien gérer le multi-threading pendant l'entraînement.
-    train("modeleCPU")
+    train("modele_v8l_9mb_")

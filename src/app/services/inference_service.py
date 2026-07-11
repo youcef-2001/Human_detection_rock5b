@@ -8,10 +8,10 @@ import platform
 import pathlib
 from typing import Optional, Tuple
 import logging
+from uuid import uuid4
 
 import cv2
 import numpy as np
-
 
 CLASSES = ["Humain", "Objet_Chaud"]
 IMG_SIZE = 320
@@ -21,8 +21,8 @@ THERMAL_WIDTH = 32
 THERMAL_HEIGHT = 24
 
 # Constants aligned with the thermal preprocessing used during training.
-TEMP_MIN_GLOBALE = 5.0
-TEMP_MAX_GLOBALE = 60.0
+TEMP_MIN_GLOBALE = 10.0
+TEMP_MAX_GLOBALE = 45.0
 SCALE_FACTOR = 10  # 32x24 -> 320x240
 
 logger = logging.getLogger(__name__)
@@ -135,13 +135,20 @@ def postprocess(
 
 def thermal_to_bgr(thermal: np.ndarray) -> np.ndarray: # image initiale transformer en image normalisé 
     """Convert thermal frame (24x32 float) into BGR image (240x320)."""
+     #Ecrit une ligne pour diminuer les valeur du tableau toutes de 10 et etendre les valeur avec *20%
+            
+    
     img_clipped = np.clip(thermal, TEMP_MIN_GLOBALE, TEMP_MAX_GLOBALE)
-    img_8u = ((img_clipped - TEMP_MIN_GLOBALE) / (TEMP_MAX_GLOBALE - TEMP_MIN_GLOBALE) *150).astype(np.uint8)
-    print(img_8u)
+    img_8u = ((img_clipped - TEMP_MIN_GLOBALE) / (TEMP_MAX_GLOBALE - TEMP_MIN_GLOBALE)*255 ).astype(np.uint8)
     large_img = cv2.resize(
         img_8u,
         (THERMAL_WIDTH * SCALE_FACTOR, THERMAL_HEIGHT * SCALE_FACTOR),
         interpolation=cv2.INTER_NEAREST)
+        #afficher image details 
+    print(
+            f"Image Transformer en thermal - dtype={large_img.dtype}, shape={large_img.shape}, "
+            f"ndim={large_img.ndim}, min={float(large_img.min())}, max={float(large_img.max())}"
+        )                             
     return cv2.cvtColor(large_img, cv2.COLOR_GRAY2BGR)
 
 
@@ -313,7 +320,7 @@ class HumanDetectorCPU:
 
         #LOgger l'image
         logger.info(
-            f"Image reçue - dtype={inp.dtype}, shape={inp.shape}, "
+            f"Image transformer INP - dtype={inp.dtype}, shape={inp.shape}, "
             f"ndim={inp.ndim}, min={float(inp.min()):.3f}, max={float(inp.max()):.3f}"
         )
 
@@ -337,6 +344,89 @@ class HumanDetectorCPU:
 
 
 
+
+class HumanDetectorCPU_RKNN:
+    """RKNN simulator-backed detector for non-RK3588 machines."""
+
+    _instance: Optional["HumanDetectorCPU_RKNN"] = None
+
+    def __new__(cls, model_path: str, conf: float, iou: float):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self, model_path: str, conf: float, iou: float):
+        if self._initialized:
+            return
+
+        try:
+            from rknn.api import RKNN
+        except Exception as exc:
+            raise RuntimeError("rknn is not available in this environment") from exc
+
+        self.conf = conf
+        self.iou = iou
+        self.session = RKNN(verbose=False)
+        self.session.config(
+            mean_values=[[0.0, 0.0, 0.0]],
+            std_values=[[255.0, 255.0, 255.0]],
+            target_platform="rk3588"
+        )
+        if   self.session.load_onnx(model_path) != 0:
+            raise RuntimeError("load_onnx a échoué")
+        if self.session.build(do_quantization=False) != 0:
+            raise RuntimeError("build a échoué")
+        if   self.session.init_runtime() != 0:
+            raise RuntimeError("init_runtime (simulateur) a échoué")
+        self._initialized = True
+        self.number = 0  # Initialize the counter for unique filenames
+
+    def infer_detections(self, image: np.ndarray) -> dict:
+        """Run inference and return human and hot-object counts."""
+        if (
+            image.ndim == 2
+            and image.shape == (THERMAL_HEIGHT, THERMAL_WIDTH)
+            and image.dtype in (np.float32, np.float64)
+        ):
+            img_bgr = thermal_to_bgr(image)
+        else:
+            img_bgr = ensure_bgr(image)
+        from scripts.test_inference_PC import postprocess, draw_and_count, letterbox as ltrbox
+
+
+        img320, ratio, pad = ltrbox(img_bgr, (IMG_SIZE, IMG_SIZE))
+        img320 = cv2.cvtColor(img320, cv2.COLOR_BGR2RGB)
+        #LOgger l'image
+        logger.info(
+            f"Image transformer Avant calcul - dtype={img320.dtype}, shape={img320.shape}, "
+            f"ndim={img320.ndim}, min={float(img320.min()):.3f}, max={float(img320.max()):.3f}"
+        )
+        
+    
+        outputs  = self.session.inference(inputs=[np.expand_dims(img320, axis=0)])
+        boxes, scores, cls_ids = postprocess(
+            outputs, img_bgr.shape, ratio, pad, conf_thres=self.conf, iou_thres=self.iou, nc=len(CLASSES)
+        )
+
+        result_img, counts = draw_and_count(img_bgr, boxes, scores, cls_ids)
+        #mkdir 
+        os.makedirs("./results/backend/", exist_ok=True)
+        self.number = self.number+1
+        # saving file for monitoring 
+        pathsave= cv2.imwrite(str(f"./results/backend/result_{self.number }.jpg"), result_img)
+        print(f"Image de résultat enregistrée dans le dossier {pathsave} avec un nom unique.")
+        human_count = int(counts.get("Humain", 99999))
+        hot_object_count = int(counts.get("Objet_Chaud", 99999))
+        return {"human_count": human_count, "hot_object_count": hot_object_count}
+
+    def release(self):
+        """Release RKNN runtime resources."""
+        self.session = None
+
+
+
+
 class InferenceService:
     """Select and expose the inference backend according to current machine."""
 
@@ -345,14 +435,14 @@ class InferenceService:
         m = _machine_name()
         c = _cpuinfo_text()
 
-
+        self.cpu_inference_mode = os.environ.get("CPU_INFERENCE_MODE", "ONNX")
         self.backend = "unavailable"
         self._init_error: Optional[str] = None
 
         try:
             if m in ("x86_64", "amd64", "i386", "i686") or "intel" in c or "amd" in c:
                 self.backend = "cpu"
-                self.detector = HumanDetectorCPU(str(onnx_model), conf, iou)
+                self.detector = HumanDetectorCPU(str(onnx_model), conf, iou) if self.cpu_inference_mode.upper() == "ONNX" else HumanDetectorCPU_RKNN(str(onnx_model), conf, iou)
             elif "rk3588" in c or "rockchip" in c:
                 self.backend = "npu"
                 self.detector = HumanDetectorNPU(str(rknn_model), conf, iou)
