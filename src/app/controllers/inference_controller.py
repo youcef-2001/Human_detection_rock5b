@@ -105,7 +105,12 @@ def detect():
                 ), 400
         else:
             return jsonify({"error": "Missing 'image' file or JSON payload"}), 400
-        
+        #LOgger l'image
+        logger.info(
+            f"Image reçue - dtype={image.dtype}, shape={image.shape}, "
+            f"ndim={image.ndim}, min={float(image.min()):.3f}, max={float(image.max()):.3f}"
+        )
+
         # Run inference
         result = _inference_service.infer(image)
         logger.info(f"Inference result: {result}")

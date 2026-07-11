@@ -7,6 +7,7 @@ import os
 import platform
 import pathlib
 from typing import Optional, Tuple
+import logging
 
 import cv2
 import numpy as np
@@ -21,10 +22,10 @@ THERMAL_HEIGHT = 24
 
 # Constants aligned with the thermal preprocessing used during training.
 TEMP_MIN_GLOBALE = 5.0
-TEMP_MAX_GLOBALE = 55.0
+TEMP_MAX_GLOBALE = 60.0
 SCALE_FACTOR = 10  # 32x24 -> 320x240
 
-
+logger = logging.getLogger(__name__)
 def _machine_name() -> str:
     """Return normalized machine architecture string."""
     return platform.machine().lower()
@@ -132,15 +133,15 @@ def postprocess(
     return boxes[keep], conf[keep], cls_ids[keep]
 
 
-def thermal_to_bgr(thermal: np.ndarray) -> np.ndarray:
+def thermal_to_bgr(thermal: np.ndarray) -> np.ndarray: # image initiale transformer en image normalisé 
     """Convert thermal frame (24x32 float) into BGR image (240x320)."""
     img_clipped = np.clip(thermal, TEMP_MIN_GLOBALE, TEMP_MAX_GLOBALE)
-    img_8u = ((img_clipped - TEMP_MIN_GLOBALE) / (TEMP_MAX_GLOBALE - TEMP_MIN_GLOBALE) * 255.0).astype(np.uint8)
+    img_8u = ((img_clipped - TEMP_MIN_GLOBALE) / (TEMP_MAX_GLOBALE - TEMP_MIN_GLOBALE) *150).astype(np.uint8)
+    print(img_8u)
     large_img = cv2.resize(
         img_8u,
         (THERMAL_WIDTH * SCALE_FACTOR, THERMAL_HEIGHT * SCALE_FACTOR),
-        interpolation=cv2.INTER_NEAREST,
-    )
+        interpolation=cv2.INTER_NEAREST)
     return cv2.cvtColor(large_img, cv2.COLOR_GRAY2BGR)
 
 
@@ -306,7 +307,15 @@ class HumanDetectorCPU:
             bgr = ensure_bgr(image)
         img320, ratio, pad = letterbox(bgr, IMG_SIZE)
         inp = cv2.cvtColor(img320, cv2.COLOR_BGR2RGB)
-        inp = np.expand_dims(inp, axis=0)
+        inp = (inp.astype(np.float32))      # Convert to float32 for ONNX runtime only
+        inp = np.transpose(inp, (2, 0, 1))          # HWC -> CHW
+        inp = np.expand_dims(inp, axis=0)           # NCHW float32 (1,3,320,320)
+
+        #LOgger l'image
+        logger.info(
+            f"Image reçue - dtype={inp.dtype}, shape={inp.shape}, "
+            f"ndim={inp.ndim}, min={float(inp.min()):.3f}, max={float(inp.max()):.3f}"
+        )
 
         outputs = self.session.run(None, {self.input_name: inp})
         _, _, cls_ids = postprocess(

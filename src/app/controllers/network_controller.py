@@ -2,11 +2,12 @@
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.client import HTTPConnection
-from socket import AF_INET, SOCK_STREAM, create_connection, getaddrinfo, gethostname
+import logging
+from socket import AF_INET, SOCK_STREAM, create_connection, getaddrinfo, gethostname , socket , SOCK_DGRAM
 from typing import Iterable
-
 from flask import Blueprint, jsonify, request
 
+logger = logging.getLogger(__name__)
 
 network_bp = Blueprint("network", __name__, url_prefix="/api/network")
 
@@ -28,6 +29,32 @@ def _normalize_hosts(values: Iterable[str]) -> list[str]:
         seen.add(host)
         hosts.append(host)
     return hosts
+
+def _local_listen_hosts() -> list[str]:
+    """IPv4 locales sur lesquelles le serveur écoute, hors loopback (127.*)."""
+    hosts: set[str] = set()
+
+    # IP de sortie principale (route par défaut) — fiable même avec plusieurs interfaces
+    try:
+        s = socket(AF_INET, SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            hosts.add(s.getsockname()[0])
+        finally:
+            s.close()
+    except OSError:
+        pass
+
+    # Toutes les IPv4 résolues par le hostname
+    try:
+        for info in getaddrinfo(gethostname(), None, AF_INET, SOCK_STREAM):
+            hosts.add(info[4][0])
+    except OSError:
+        pass
+
+    return _normalize_hosts(
+        h for h in hosts if h and not h.startswith("127.")
+    )
 
 
 def _looks_like_esp32_page(body: str) -> bool:
@@ -119,6 +146,10 @@ def scan_esp32_on_backend():
 
     preferred_hosts = _normalize_hosts(data.get("preferred_hosts", []))
     extra_candidates = _normalize_hosts(data.get("extra_candidates", []))
+    server_hosts = _local_listen_hosts()
+    logger.info("Hôtes d'écoute du backend : %s", server_hosts)
+    extra_candidates = _normalize_hosts([*extra_candidates, *server_hosts])
+
 
     timeout_ms = int(data.get("timeout_ms", 700))
     timeout_ms = max(150, min(timeout_ms, 5000))

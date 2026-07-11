@@ -135,12 +135,19 @@ def main():
     args = parser.parse_args()
 
     img0 = cv2.imread(args.image)
+    print(
+            f"Image reçue - dtype={img0.dtype}, shape={img0.shape}, "
+            f"ndim={img0.ndim}, min={float(img0.min()):.3f}, max={float(img0.max()):.3f}"
+        )
     if img0 is None:
         raise FileNotFoundError(args.image)
 
     img, ratio, pad = letterbox(img0, (args.imgsz, args.imgsz))
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+    print(
+            f"Image reçue - dtype={img.dtype}, shape={img.shape}, "
+            f"ndim={img.ndim}, min={float(img.min()):.3f}, max={float(img.max()):.3f}"
+        )
     rknn = RKNN(verbose=False)
 
     # Aligne la simulation PC avec la conversion RKNN: suppression des warnings mean/std.

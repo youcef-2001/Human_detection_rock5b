@@ -17,7 +17,8 @@ tests.log
 __pycache__/
 *.pyc
 *.pyo
-
+*/__pycache__/
+**/__pycache__/
 # Project specific
 results/
 check*
