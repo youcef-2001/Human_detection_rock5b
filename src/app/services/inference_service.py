@@ -362,6 +362,121 @@ class HumanDetectorCPU:
 
 
 
+
+
+class HumanDetectorCUDA:
+    """Détecteur Torch/Ultralytics (best.pt) — CUDA si dispo, sinon CPU."""
+
+    _instance: Optional["HumanDetectorCUDA"] = None
+
+    # Chemin par défaut du checkpoint YOLO, résolu relativement à ce fichier.
+    DEFAULT_PT = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..", "..", "..", "scripts", "runs", "detect",
+        "models", "modele_v8l_9mb_3", "weights", "best.pt",
+    )
+
+    def __new__(cls, model_path: str, conf: float, iou: float):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self, model_path: str, conf: float, iou: float):
+        if self._initialized:
+            return
+
+        try:
+            import torch
+            from ultralytics import YOLO
+        except Exception as exc:
+            raise RuntimeError(
+                "PyTorch/ultralytics ne sont pas disponibles dans cet environnement"
+            ) from exc
+
+        self.conf = conf
+        self.iou = iou
+        # Sélection agnostique du device.
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # `best.pt` prioritaire : si model_path pointe déjà sur un .pt on l'utilise,
+        # sinon on retombe sur le chemin par défaut fourni.
+        pt_path = model_path if (model_path and str(model_path).endswith(".pt")) else self.DEFAULT_PT
+        pt_path = os.path.abspath(pt_path)
+        if not os.path.exists(pt_path):
+            raise RuntimeError(f"Modèle introuvable: {pt_path}")
+
+        # Vérifie que le checkpoint est bien lisible par torch avant de le charger via YOLO.
+        try:
+            torch.load(pt_path, map_location="cpu", weights_only=False)
+        except Exception as exc:
+            raise RuntimeError(f"Checkpoint torch illisible: {pt_path}") from exc
+
+        # Chargement via Ultralytics (gère le prétraitement/letterbox/NMS en interne).
+        self.model = YOLO(pt_path)
+        self.model.to(self.device)
+
+        self._initialized = True
+        self.number = 0  # Compteur pour des noms de fichiers uniques
+        logger.info(f"HumanDetectorCUDA prêt — device={self.device}, modèle={pt_path}")
+
+    def infer_detections(self, image: np.ndarray) -> dict:
+        """Run inference and return human and hot-object counts."""
+        if (
+            image.ndim == 2
+            and image.shape == (THERMAL_HEIGHT, THERMAL_WIDTH)
+            and image.dtype in (np.float32, np.float64)
+        ):
+            bgr = thermal_to_bgr(image)
+        else:
+            bgr = ensure_bgr(image)
+
+        # Ultralytics accepte un numpy BGR et gère letterbox + normalisation en interne.
+        results = self.model.predict(
+            source=bgr,
+            imgsz=IMG_SIZE,
+            conf=self.conf,
+            iou=self.iou,
+            device=self.device,
+            verbose=False,
+        )
+        res = results[0]
+        if res.boxes is not None and len(res.boxes):
+            cls_ids = res.boxes.cls.cpu().numpy().astype(int)
+        else:
+            cls_ids = np.empty(0, dtype=int)
+
+        logger.info(
+            f"Torch INP - device={self.device}, shape={bgr.shape}, détections={len(cls_ids)}"
+        )
+
+        # Dessin + sauvegarde pour monitoring (même logique que le chemin RKNN).
+        result_img = res.plot()  # image annotée BGR
+        os.makedirs("./results/backend/", exist_ok=True)
+        self.number += 1
+        pathsave = cv2.imwrite(f"./results/backend/result_{self.number}_torch.jpg", result_img)
+        logger.info(
+            f"Image Torch enregistrée: result_{self.number}_torch.jpg "
+            f"(ok={pathsave}, device={self.device})"
+        )
+
+        human_count = int(np.sum(cls_ids == HUMAN_CLASS_INDEX)) if len(cls_ids) else 0
+        hot_object_count = int(np.sum(cls_ids == HOT_OBJECT_CLASS_INDEX)) if len(cls_ids) else 0
+        return {"human_count": human_count, "hot_object_count": hot_object_count}
+
+    def release(self):
+        """Release Torch runtime resources."""
+        self.model = None
+
+
+
+
+
+
+
+
+
+
 class HumanDetectorCPU_RKNN:
     """RKNN simulator-backed detector for non-RK3588 machines."""
 
@@ -460,7 +575,12 @@ class InferenceService:
             if m in ("x86_64", "amd64", "i386", "i686") or "intel" in c or "amd" in c:
                 self.backend = "cpu"
                 print (f"CPU inference mode: {self.cpu_inference_mode}")
-                self.detector = HumanDetectorCPU(str(onnx_model), conf, iou) if self.cpu_inference_mode == "ONNX" else HumanDetectorCPU_RKNN(str(onnx_model), conf, iou)
+                if self.cpu_inference_mode == "ONNX":
+                    self.detector = HumanDetectorCPU(str(onnx_model), conf, iou)
+                elif self.cpu_inference_mode == "RKNN":
+                    self.detector = HumanDetectorCPU_RKNN(str(onnx_model), conf, iou)
+                elif self.cpu_inference_mode == "CUDA_PYTORCH":
+                    self.detector = HumanDetectorCUDA(str(onnx_model), conf, iou)
             elif "rk3588" in c or "rockchip" in c:
                 self.backend = "npu"
                 self.detector = HumanDetectorNPU(str(rknn_model), conf, iou)

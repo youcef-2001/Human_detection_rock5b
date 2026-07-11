@@ -20,7 +20,8 @@ numpy<=1.26.0
 # Model Inference - Core dependencies (minimal)
 onnxruntime>=1.24.4
 onnx==1.16.1
-
+torch==2.6.0
+ultralytics>=8.0.0
 # WebSocket and Async
 websockets>=14.1
 aiohttp>=3.9.0
