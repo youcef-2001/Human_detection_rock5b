@@ -21,8 +21,8 @@ THERMAL_WIDTH = 32
 THERMAL_HEIGHT = 24
 
 # Constants aligned with the thermal preprocessing used during training.
-TEMP_MIN_GLOBALE = 10.0
-TEMP_MAX_GLOBALE = 45.0
+TEMP_MIN_GLOBALE = 15.0
+TEMP_MAX_GLOBALE = 49.0
 SCALE_FACTOR = 10  # 32x24 -> 320x240
 
 logger = logging.getLogger(__name__)
